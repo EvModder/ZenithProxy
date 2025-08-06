@@ -347,7 +347,8 @@ public class DiscordBot {
     }
 
     public void defaultEmbedDecoration(Embed embed) {
-        if (embed.timestamp() == null) embed.timestamp(Instant.now());
+        //TODO: add config option for this
+        // if (embed.timestamp() == null) embed.timestamp(Instant.now());
     }
 
     public void sendEmbedMessageTo(TextChannel channel, @Nullable String message, Embed embed) {

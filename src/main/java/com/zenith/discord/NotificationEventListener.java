@@ -81,10 +81,10 @@ public class NotificationEventListener {
             of(UpdateStartEvent.class, this::handleUpdateStartEvent),
             of(ServerRestartingEvent.class, this::handleServerRestartingEvent),
             of(ClientLoginFailedEvent.class, this::handleProxyLoginFailedEvent),
-            of(ClientStartConnectEvent.class, this::handleStartConnectEvent),
+            // of(ClientStartConnectEvent.class, this::handleStartConnectEvent),
             of(PrioStatusUpdateEvent.class, this::handlePrioStatusUpdateEvent),
             of(PrioBanStatusUpdateEvent.class, this::handlePrioBanStatusUpdateEvent),
-            of(AutoReconnectEvent.class, this::handleAutoReconnectEvent),
+            // of(AutoReconnectEvent.class, this::handleAutoReconnectEvent),
             of(MsaDeviceCodeLoginEvent.class, this::handleMsaDeviceCodeLoginEvent),
             of(UpdateAvailableEvent.class, this::handleUpdateAvailableEvent),
             of(ReplayStartedEvent.class, this::handleReplayStartedEvent),
@@ -144,7 +144,7 @@ public class NotificationEventListener {
 
     public void handleConnectEvent(ClientConnectEvent event) {
         var embed = Embed.builder()
-            .title("Connected")
+            .title(CONFIG.authentication.username+" connected")
             .inQueueColor()
             .addField("Server", CONFIG.client.server.address, true)
             .addField("Proxy IP", CONFIG.server.getProxyAddress(), false);
@@ -158,7 +158,7 @@ public class NotificationEventListener {
 
     public void handlePlayerOnlineEvent(ClientOnlineEvent event) {
         var embedBuilder = Embed.builder()
-            .title("Online")
+            .title(CONFIG.authentication.username+" online")
             .successColor();
         event.queueWait()
             .ifPresent(duration -> embedBuilder.addField("Queue Duration", formatDuration(duration), true));
@@ -172,9 +172,9 @@ public class NotificationEventListener {
     public void handleDisconnectEvent(ClientDisconnectEvent event) {
         var category = DisconnectReasonInfo.getDisconnectCategory(event.reason());
         var embed = Embed.builder()
-            .title("Disconnected")
+            .title(CONFIG.authentication.username+" disconnected")
             .addField("Reason", event.reason(), false)
-            .addField("Why?", category.getWikiURL(), false)
+            // .addField("Why?", category.getWikiURL(), false)//TODO: config option
             .addField("Category", category.toString(), false)
             .addField("Online Duration", formatDuration(event.onlineDurationWithQueueSkip()), false)
             .errorColor();
@@ -226,7 +226,7 @@ public class NotificationEventListener {
 
     private void handleQueueWarning(QueueWarningEvent event) {
         sendEmbedMessage((event.mention() ? notificationMention() : ""), Embed.builder()
-            .title("Queue Warning")
+            .title(CONFIG.authentication.username+" Queue Warning")
             .addField("Queue Position", "[" + Queue.queuePositionStr() + "]", false)
             .inQueueColor());
     }
@@ -253,7 +253,7 @@ public class NotificationEventListener {
 
     public void handleStartQueueEvent(QueueStartEvent event) {
         var embed = Embed.builder()
-            .title("Started Queuing")
+            .title(CONFIG.authentication.username+" started queuing")
             .inQueueColor()
             .addField("Regular Queue", Queue.getQueueStatus().regular(), true)
             .addField("Priority Queue", Queue.getQueueStatus().prio(), true);
@@ -292,7 +292,7 @@ public class NotificationEventListener {
 
     public void handleHealthAutoDisconnectEvent(HealthAutoDisconnectEvent event) {
         var embed = Embed.builder()
-            .title("Health AutoDisconnect Triggered")
+            .title(CONFIG.authentication.username+" Health AutoDisconnect Triggered")
             .addField("Health", CACHE.getPlayerCache().getThePlayer().getHealth(), true)
             .primaryColor();
         if (CONFIG.client.extra.utility.actions.autoDisconnect.mentionOnDisconnect) {
@@ -305,9 +305,9 @@ public class NotificationEventListener {
     public void handleProxyClientConnectedEvent(PlayerConnectedEvent event) {
         if (!CONFIG.discord.clientConnectionMessages) return;
         var embed = Embed.builder()
-            .title("Client Connected")
+            .title(CONFIG.authentication.username+"-Proxy connected")
             .addField("Username", escape(event.clientGameProfile().getName()), false)
-            .addField("MC Version", event.session().getMCVersion(), false)
+            // .addField("MC Version", event.session().getMCVersion(), false)//TODO: config field
             .thumbnail(Proxy.getInstance().getPlayerBodyURL(event.clientGameProfile().getId()).toString())
             .primaryColor();
         if (CONFIG.discord.mentionOnClientConnected) {
@@ -368,14 +368,14 @@ public class NotificationEventListener {
     public void handleProxyClientDisconnectedEvent(PlayerDisconnectedEvent event) {
         if (!CONFIG.discord.clientConnectionMessages) return;
         var embed = Embed.builder()
-            .title("Client Disconnected")
+            .title(CONFIG.authentication.username+"-Proxy disconnected")
             .errorColor();
         if (nonNull(event.clientGameProfile())) {
             embed = embed.addField("Username", escape(event.clientGameProfile().getName()), false);
         }
-        if (nonNull(event.reason())) {
-            embed = embed.addField("Reason", escape(event.reason()), false);
-        }
+        // if (nonNull(event.reason())) {//TODO: config option
+        //     embed = embed.addField("Reason", escape(event.reason()), false);
+        // }
         if (CONFIG.discord.mentionOnClientDisconnected) {
             sendEmbedMessage(notificationMention(), embed);
         } else {
