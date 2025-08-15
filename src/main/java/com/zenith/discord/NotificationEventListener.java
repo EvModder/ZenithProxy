@@ -305,8 +305,9 @@ public class NotificationEventListener {
     public void handleProxyClientConnectedEvent(PlayerConnectedEvent event) {
         if (!CONFIG.discord.clientConnectionMessages) return;
         var embed = Embed.builder()
-            .title(CONFIG.authentication.username+"-Proxy connected")
-            .addField("Username", escape(event.clientGameProfile().getName()), false)
+            .title(event.clientGameProfile().getName()+" connected to "+CONFIG.authentication.username+"-Proxy")
+            // .title(CONFIG.authentication.username+"-Proxy connected")
+            // .addField("Username", escape(event.clientGameProfile().getName()), false)
             // .addField("MC Version", event.session().getMCVersion(), false)//TODO: config field
             .thumbnail(Proxy.getInstance().getPlayerBodyURL(event.clientGameProfile().getId()).toString())
             .primaryColor();
@@ -353,9 +354,10 @@ public class NotificationEventListener {
     public void handleProxySpectatorConnectedEvent(SpectatorConnectedEvent event) {
         if (!CONFIG.discord.clientConnectionMessages) return;
         var embed = Embed.builder()
-            .title("Spectator Connected")
-            .addField("Username", escape(event.clientGameProfile().getName()), false)
-            .addField("MC Version", event.session().getMCVersion(), false)
+            .title(event.clientGameProfile().getName()+" is spectating "+CONFIG.authentication.username+"-Proxy")
+            // .title("Spectator Connected")
+            // .addField("Username", escape(event.clientGameProfile().getName()), false)
+            // .addField("MC Version", event.session().getMCVersion(), false)
             .thumbnail(Proxy.getInstance().getPlayerBodyURL(event.clientGameProfile().getId()).toString())
             .primaryColor();
         if (CONFIG.discord.mentionOnSpectatorConnected) {
@@ -368,11 +370,13 @@ public class NotificationEventListener {
     public void handleProxyClientDisconnectedEvent(PlayerDisconnectedEvent event) {
         if (!CONFIG.discord.clientConnectionMessages) return;
         var embed = Embed.builder()
-            .title(CONFIG.authentication.username+"-Proxy disconnected")
+            .title(
+                (nonNull(event.clientGameProfile()) ? event.clientGameProfile().getName() : "null")+" disconnected from "+CONFIG.authentication.username+"-Proxy")
+            // .title(CONFIG.authentication.username+"-Proxy disconnected")
             .errorColor();
-        if (nonNull(event.clientGameProfile())) {
-            embed = embed.addField("Username", escape(event.clientGameProfile().getName()), false);
-        }
+        // if (nonNull(event.clientGameProfile())) {
+        //     embed = embed.addField("Username", escape(event.clientGameProfile().getName()), false);
+        // }
         // if (nonNull(event.reason())) {//TODO: config option
         //     embed = embed.addField("Reason", escape(event.reason()), false);
         // }
@@ -384,8 +388,9 @@ public class NotificationEventListener {
     }
 
     public void handleVisualRangeEnterEvent(VisualRangeEnterEvent event) {
+        if(!Proxy.getInstance().getActiveConnections().isEmpty()) return;
         var embedCreateSpec = Embed.builder()
-            .title("Player In Visual Range")
+            .title("Player In Visual Range of "+CONFIG.authentication.username)
             .color(event.isFriend() ? CONFIG.theme.success.color() : CONFIG.theme.error.color())
             .addField("Player Name", escape(event.playerEntry().getName()), true)
             .addField("Player UUID", ("[" + event.playerEntry().getProfileId() + "](https://namemc.com/profile/" + event.playerEntry().getProfileId() + ")"), true)
@@ -433,8 +438,9 @@ public class NotificationEventListener {
     }
 
     public void handleVisualRangeLeaveEvent(final VisualRangeLeaveEvent event) {
+        if(!Proxy.getInstance().getActiveConnections().isEmpty()) return;
         var embedCreateSpec = Embed.builder()
-            .title("Player Left Visual Range")
+            .title("Player Left Visual Range of "+CONFIG.authentication.username)
             .color(event.isFriend() ? CONFIG.theme.success.color() : CONFIG.theme.error.color())
             .addField("Player Name", escape(event.playerEntry().getName()), true)
             .addField("Player UUID", ("[" + event.playerEntity().getUuid() + "](https://namemc.com/profile/" + event.playerEntry().getProfileId() + ")"), true)
@@ -451,6 +457,7 @@ public class NotificationEventListener {
     }
 
     public void handleVisualRangeLogoutEvent(final VisualRangeLogoutEvent event) {
+        if(!Proxy.getInstance().getActiveConnections().isEmpty()) return;
         var embedCreateSpec = Embed.builder()
             .title("Player Logout In Visual Range")
             .color(event.isFriend() ? CONFIG.theme.success.color() : CONFIG.theme.error.color())
