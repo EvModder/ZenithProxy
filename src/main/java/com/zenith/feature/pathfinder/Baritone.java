@@ -43,6 +43,7 @@ import static com.zenith.Globals.*;
 
 @Data
 public class Baritone implements Pathfinder {
+    public static final int POST_TICK_PRIORITY = -40000;
     public static final int MOVEMENT_PRIORITY = 200;
     private final PathingBehavior pathingBehavior = new PathingBehavior(this);
     private final InputOverrideHandler inputOverrideHandler = new InputOverrideHandler(this);
@@ -75,7 +76,7 @@ public class Baritone implements Pathfinder {
         EVENT_BUS.subscribe(
             this,
             of(ClientBotTick.class, this::onClientBotTick),
-            of(ClientBotTick.class, -40000, this::onClientBotTickPost),
+            of(ClientBotTick.class, POST_TICK_PRIORITY, this::onClientBotTickPost),
             of(ClientBotTick.Starting.class, this::onClientBotTickStarting),
             of(ClientBotTick.Stopped.class, this::onClientBotTickStopped)
         );

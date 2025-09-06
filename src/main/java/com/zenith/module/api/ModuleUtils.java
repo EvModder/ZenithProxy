@@ -50,7 +50,7 @@ public abstract class ModuleUtils {
     protected final String moduleLogPrefix = "[" + this.getClass().getSimpleName() + "] ";
 
     public void debug(String msg) {
-        MODULE_LOG.debug(moduleLogPrefix + msg);
+        MODULE_LOG.debug("{}{}", moduleLogPrefix, msg);
     }
 
     public void debug(String msg, Object... args) {
@@ -62,7 +62,7 @@ public abstract class ModuleUtils {
     }
 
     public void info(String msg) {
-        MODULE_LOG.info(moduleLogPrefix + msg);
+        MODULE_LOG.info("{}{}", moduleLogPrefix, msg);
     }
 
     public void info(String msg, Object... args) {
@@ -74,7 +74,7 @@ public abstract class ModuleUtils {
     }
 
     public void warn(String msg) {
-        MODULE_LOG.warn(moduleLogPrefix + msg);
+        MODULE_LOG.warn("{}{}", moduleLogPrefix, msg);
     }
 
     public void warn(String msg, Object... args) {
@@ -86,7 +86,7 @@ public abstract class ModuleUtils {
     }
 
     public void error(String msg) {
-        MODULE_LOG.error(moduleLogPrefix + msg);
+        MODULE_LOG.error("{}{}", moduleLogPrefix, msg);
     }
 
     public void error(String msg, Object... args) {
@@ -99,18 +99,18 @@ public abstract class ModuleUtils {
 
     protected final String moduleAlertPrefix = "<gray>[<aqua>" + this.getClass().getSimpleName() + "<gray>]<reset> ";
 
-    public void inGameAlert(String minedown) {
+    public void inGameAlert(String minimessage) {
         var connections = Proxy.getInstance().getActiveConnections().getArray();
         for (int i = 0; i < connections.length; i++) {
             var connection = connections[i];
-            connection.sendAsyncAlert(moduleAlertPrefix + minedown);
+            connection.sendAsyncAlert(moduleAlertPrefix + minimessage);
         }
     }
 
-    public void inGameAlertActivePlayer(String minedown) {
+    public void inGameAlertActivePlayer(String minimessage) {
         var connection = Proxy.getInstance().getActivePlayer();
         if (connection == null) return;
-        connection.sendAsyncAlert(moduleAlertPrefix + minedown);
+        connection.sendAsyncAlert(moduleAlertPrefix + minimessage);
     }
 
     // is also logged to the terminal
@@ -124,7 +124,7 @@ public abstract class ModuleUtils {
         EXECUTOR.execute(() -> CommandOutputHelper.logEmbedOutputToInGameAllConnectedPlayers(embed));
     }
 
-    public void disconnect(ServerSession session, String reason) {
-        session.disconnect(ComponentSerializer.minimessage("<red>" + moduleLogPrefix + "</red><gray>" + reason));
+    public void disconnect(ServerSession session, String minimessage) {
+        session.disconnect(ComponentSerializer.minimessage("<red>" + moduleLogPrefix + "</red><gray>" + minimessage));
     }
 }

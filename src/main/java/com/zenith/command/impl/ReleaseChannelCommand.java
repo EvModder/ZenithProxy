@@ -21,7 +21,6 @@ import java.util.stream.Stream;
 
 import static com.mojang.brigadier.arguments.StringArgumentType.getString;
 import static com.zenith.Globals.*;
-import static com.zenith.command.brigadier.CustomStringArgumentType.wordWithChars;
 import static java.util.Arrays.asList;
 
 public class ReleaseChannelCommand extends Command {
@@ -71,8 +70,8 @@ public class ReleaseChannelCommand extends Command {
                     .primaryColor();
             }))
             .then(literal("set")
-                .then(argument("channel", wordWithChars())
-                    .then(argument("minecraft_version", wordWithChars()).executes(c -> {
+                .then(argument("channel", enumStrings(PLATFORMS))
+                    .then(argument("minecraft_version", enumStrings(MINECRAFT_VERSIONS)).executes(c -> {
                             final String channel = getString(c, "channel");
                             final String minecraft_version = getString(c, "minecraft_version");
                             setChannel(c, channel, minecraft_version, false, false);
@@ -85,11 +84,11 @@ public class ReleaseChannelCommand extends Command {
                             return OK;
                         }))
                         .then(literal("pre").executes(c -> {
-                            final String channel = getString(c, "channel");
-                            final String minecraft_version = getString(c, "minecraft_version");
-                            setChannel(c, channel, minecraft_version, true, false);
-                            return OK;
-                        })
+                                final String channel = getString(c, "channel");
+                                final String minecraft_version = getString(c, "minecraft_version");
+                                setChannel(c, channel, minecraft_version, true, false);
+                                return OK;
+                            })
                             .then(literal("force").executes(c -> {
                                 final String channel = getString(c, "channel");
                                 final String minecraft_version = getString(c, "minecraft_version");

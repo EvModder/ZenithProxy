@@ -1,7 +1,9 @@
 package com.zenith.util.config;
 
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+@NullMarked
 public class LaunchConfig {
     public boolean auto_update = true;
     public boolean auto_update_launcher = true;
@@ -17,5 +19,5 @@ public class LaunchConfig {
     public String local_version = "0.0.0";
     public String repo_owner = "rfresh2";
     public String repo_name = "ZenithProxy";
-    public @ConfigNullable @Nullable String custom_jvm_args = null;
+    public @Nullable String custom_jvm_args = null;
 }

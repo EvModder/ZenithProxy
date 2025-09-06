@@ -129,7 +129,7 @@ public class Embed {
 
     public MessageEmbed toJDAEmbed() {
         var builder = new EmbedBuilder();
-        if (!validateEmbed(this)) {
+        if (!truncateEmbed(this)) {
             return builder.build();
         }
         builder
@@ -153,7 +153,7 @@ public class Embed {
         return new Embed();
     }
 
-    private boolean validateEmbed(Embed embed) {
+    public static boolean validateEmbed(Embed embed) {
         int charCount = 0;
         if (embed.isTitlePresent()) {
             charCount += embed.title().length();
@@ -196,6 +196,59 @@ public class Embed {
             if (embed.author().name().length() > 256) {
                 DISCORD_LOG.error("Embed author name exceeds 256 characters: {}", embed.author().name());
                 return false;
+            }
+            charCount += embed.author().name().length();
+        }
+        if (charCount > 6000) {
+            DISCORD_LOG.error("Embed character count exceeds 6000 characters");
+            return false;
+        }
+        return true;
+    }
+
+    public static boolean truncateEmbed(Embed embed) {
+        int charCount = 0;
+        if (embed.isTitlePresent()) {
+            charCount += embed.title().length();
+            if (embed.title().length() > 256) {
+                embed.title(embed.title().substring(0, 256));
+            }
+        }
+        if (embed.isDescriptionPresent()) {
+            charCount += embed.description().length();
+            if (embed.description().length() > 4096) {
+                embed.description(embed.description().substring(0, 4096));
+            }
+        }
+        if (embed.fields().size() > 25) {
+            embed.fields(new ArrayList<>(embed.fields().subList(0, 25)));
+        }
+        for (int i = 0; i < embed.fields().size(); i++) {
+            var field = embed.fields().get(i);
+            var fieldName = field.name();
+            var fieldValue = field.value();
+            if (fieldName.length() > 256) {
+                fieldName = fieldName.substring(0, 256);
+            }
+            if (field.value().length() > 1024) {
+                fieldValue = field.value().substring(0, 1024);
+            }
+            if (!fieldName.equals(field.name()) || !fieldValue.equals(field.value())) {
+                embed.fields().remove(i);
+                embed.fields().add(i, new Field(fieldName, fieldValue, field.inline()));
+            }
+            charCount += fieldName.length() + fieldValue.length();
+        }
+        if (embed.footer() != null) {
+            if (embed.footer().text().length() > 2048) {
+                var newFooter = new Footer(embed.footer().text().substring(0, 2048), embed.footer().iconUrl());
+                embed.footer(newFooter);
+            }
+            charCount += embed.footer().text().length();
+        }
+        if (embed.author() != null) {
+            if (embed.author().name().length() > 256) {
+                embed.author(new Author(embed.author().name().substring(0, 256), embed.author().url(), embed.author().iconUrl()));
             }
             charCount += embed.author().name().length();
         }

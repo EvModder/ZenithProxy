@@ -849,9 +849,9 @@ public class NotificationEventListener {
         DISCORD.sendEmbedMessageWithButtons(embed, buttons, mapper, timeout);
     }
     public void updatePresence(final OnlineStatus onlineStatus, final Activity activity) {
-        DISCORD.updatePresence(onlineStatus, activity);
+        DISCORD.setPresence(onlineStatus, activity);
     }
     public void updatePresence() {
-        DISCORD.updatePresence();
+        DISCORD.tickPresence();
     }
 }

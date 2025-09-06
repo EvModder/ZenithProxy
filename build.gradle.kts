@@ -1,7 +1,8 @@
 plugins {
     `java-library`
     id("org.graalvm.buildtools.native") version "0.11.0"
-    id("com.gradleup.shadow") version "9.0.0-rc3"
+    id("com.gradleup.shadow") version "9.1.0"
+    id("io.freefair.lombok") version "8.14.2"
     `maven-publish`
 }
 
@@ -25,9 +26,9 @@ repositories {
     mavenLocal()
 }
 
-val mcplVersion = "1.21.4.27"
+val mcplVersion = "1.21.4.28"
 dependencies {
-    api("com.github.rfresh2:JDA:6.0.16") {
+    api("com.github.rfresh2:JDA:6.0.17") {
         exclude(group = "club.minnced")
         exclude(group = "net.java.dev.jna")
         exclude(group = "com.google.crypto.tink")
@@ -35,7 +36,7 @@ dependencies {
     api("com.github.rfresh2:MCProtocolLib:$mcplVersion") {
         exclude(group = "io.netty")
     }
-    api(platform("io.netty:netty-bom:4.2.3.Final"))
+    api(platform("io.netty:netty-bom:4.2.5.Final"))
     api("io.netty:netty-buffer")
     api("io.netty:netty-codec-haproxy")
     api("io.netty:netty-codec-dns")
@@ -53,7 +54,7 @@ dependencies {
     api("io.netty:netty-resolver-dns-native-macos") { artifact { classifier = "osx-aarch_64" } }
     api("org.cloudburstmc.math:api:2.0")
     api("org.cloudburstmc.math:immutable:2.0")
-    api("org.redisson:redisson:3.50.0") {
+    api("org.redisson:redisson:3.51.0") {
         exclude(group = "io.netty")
     }
     api("com.github.rfresh2:SimpleEventBus:1.6")
@@ -70,10 +71,10 @@ dependencies {
     api("com.viaversion:vialoader:4.0.4")
     api("com.viaversion:viaversion:5.4.2")
     api("com.viaversion:viabackwards:5.4.2")
-    api("org.jline:jline:3.30.4")
-    api("org.jline:jline-terminal-jni:3.30.4")
+    api("org.jline:jline:3.30.5")
+    api("org.jline:jline-terminal-jni:3.30.5")
     api("ar.com.hjg:pngj:2.1.0")
-    api("com.zaxxer:HikariCP:7.0.0")
+    api("com.zaxxer:HikariCP:7.0.2")
     api("org.postgresql:postgresql:42.7.7")
     api("org.jdbi:jdbi3-postgres:3.49.5")
     api("com.google.guava:guava:33.4.6-jre")
@@ -81,19 +82,18 @@ dependencies {
     api("org.slf4j:slf4j-api:2.0.17")
     api("org.slf4j:jul-to-slf4j:2.0.17")
     api("com.mojang:brigadier:1.3.10")
-    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.19.2")
+    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.20.0")
     api("org.jspecify:jspecify:1.0.0")
     api("net.kyori:adventure-text-logger-slf4j:4.24.0")
     api("dev.omega24:upnp4j:1.0")
     testImplementation("org.junit.jupiter:junit-jupiter:5.13.4")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    val lombokVersion = "1.18.38"
-    compileOnly("org.projectlombok:lombok:$lombokVersion")
-    testCompileOnly("org.projectlombok:lombok:$lombokVersion")
-    annotationProcessor("org.projectlombok:lombok:$lombokVersion")
-    testAnnotationProcessor("org.projectlombok:lombok:$lombokVersion")
     compileOnly("com.google.auto.service:auto-service-annotations:1.1.1")
     annotationProcessor("com.google.auto.service:auto-service:1.1.1")
+}
+
+lombok {
+    version = "1.18.38"
 }
 
 tasks {
@@ -262,6 +262,10 @@ graalvmNative {
     metadataRepository { enabled = true }
 }
 
+shadow {
+    addShadowVariantIntoJavaComponent = false
+}
+
 publishing {
     repositories {
         maven {
@@ -292,17 +296,13 @@ publishing {
             groupId = "com.zenith"
             artifactId = "ZenithProxy"
             version = "${project.version}-SNAPSHOT"
-            val javaComponent = components["java"] as AdhocComponentWithVariants
-            javaComponent.withVariantsFromConfiguration(configurations["shadowRuntimeElements"]) { skip() }
-            from(javaComponent)
+            from(components["java"])
         }
         create<MavenPublication>("release") {
             groupId = "com.zenith"
             artifactId = "ZenithProxy"
             version =  providers.environmentVariable("ZENITH_RELEASE_TAG").orElse("0.0.0+${project.version}").get()
-            val javaComponent = components["java"] as AdhocComponentWithVariants
-            javaComponent.withVariantsFromConfiguration(configurations["shadowRuntimeElements"]) { skip() }
-            from(javaComponent)
+            from(components["java"])
         }
     }
 }

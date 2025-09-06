@@ -7,6 +7,8 @@ import static com.github.rfresh2.EventConsumer.of;
 import static com.zenith.Globals.EVENT_BUS;
 
 public final class TickTimerManager {
+    // before any modules
+    public static final int TICK_PRIORITY = Integer.MAX_VALUE - 1;
     public static final TickTimerManager INSTANCE = new TickTimerManager();
 
     @Getter
@@ -15,7 +17,7 @@ public final class TickTimerManager {
     private TickTimerManager() {
         EVENT_BUS.subscribe(
             this,
-            of(ClientTickEvent.class, 100_000_000, this::onClientTick)
+            of(ClientTickEvent.class, TICK_PRIORITY, this::onClientTick)
         );
     }
 

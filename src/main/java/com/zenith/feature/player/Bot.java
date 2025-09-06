@@ -44,6 +44,8 @@ import static com.github.rfresh2.EventConsumer.of;
 import static com.zenith.Globals.*;
 
 public final class Bot extends ModuleUtils {
+    public static final int TICK_PRIORITY = -20000;
+    public static final int POST_TICK_PRIORITY = -30000;
     @Getter private double x;
     @Getter private double y;
     @Getter private double z;
@@ -104,8 +106,8 @@ public final class Bot extends ModuleUtils {
             // we want this to be one of the last thing that happens in the tick
             // to allow other modules to update the player's input
             // other modules can also do actions after this tick by setting an even lower priority
-            of(ClientBotTick.class, -20000, this::tick),
-            of(ClientBotTick.class, -30000, this::postTick),
+            of(ClientBotTick.class, TICK_PRIORITY, this::tick),
+            of(ClientBotTick.class, POST_TICK_PRIORITY, this::postTick),
             of(ClientBotTick.Starting.class, this::handleClientTickStarting),
             of(ClientBotTick.Stopped.class, this::handleClientTickStopped)
         );
@@ -218,6 +220,8 @@ public final class Bot extends ModuleUtils {
                     inputRequestFuture.setClickResult(ClickResult.RightClickResult.useItem());
                 }
             }
+            // todo: track ongoing right click item consumes
+            //  and if one is cancelled, do interactions.releaseUsingItem()
             interactions.stopDestroyBlock();
             wasLeftClicking = false;
         } catch (final Exception e) {
@@ -259,7 +263,11 @@ public final class Bot extends ModuleUtils {
         } else {
             isFallFlying = false;
         }
-        isSneaking = movementInput.sneaking;
+
+        isSneaking = !isFlying
+            && !CACHE.getPlayerCache().getThePlayer().isInVehicle()
+            && canPlayerFitWithinBlocksAndEntitiesWhen(SNEAKING_COLLISION_BOX)
+            && (movementInput.sneaking || !CACHE.getPlayerCache().getThePlayer().isSleeping() && !canPlayerFitWithinBlocksAndEntitiesWhen(STANDING_COLLISION_BOX));
         isSprinting = movementInput.sprinting
             && isOnGround()
             && !isTouchingWater
@@ -294,6 +302,7 @@ public final class Bot extends ModuleUtils {
             velocity.set(0, 0, 0);
         } else {
             travel(movementInputVec);
+            tryCheckInsideBlocks();
         }
 
         if (CACHE.getPlayerCache().getThePlayer().isInVehicle()) {
@@ -697,7 +706,6 @@ public final class Bot extends ModuleUtils {
         this.y = movedPlayerCollisionBox.minY();
         this.z = ((movedPlayerCollisionBox.minZ() + movedPlayerCollisionBox.maxZ()) / 2.0);
         syncPlayerCollisionBox();
-        tryCheckInsideBlocks();
         float velocityMultiplier = MathHelper.lerp(movementEfficiency, this.getBlockSpeedFactor(), 1.0f);
         velocity.multiply(velocityMultiplier, 1.0, velocityMultiplier);
     }
@@ -738,17 +746,21 @@ public final class Bot extends ModuleUtils {
         if (collidingBlockStates.isEmpty()) return;
         for (int i = 0; i < collidingBlockStates.size(); i++) {
             var localState = collidingBlockStates.get(i);
-            if (localState.id() == BlockRegistry.BUBBLE_COLUMN.minStateId()) {
-                if (BLOCK_DATA.isAir(World.getBlock(localState.x(), localState.y() + 1, localState.z()))) {
-                    velocity.setY(Math.max(-0.9, velocity.getY() - 0.03));
+            if (localState.block() == BlockRegistry.BUBBLE_COLUMN) {
+                var dragDownState = World.getBlockStateProperty(localState.block(), localState.id(), BlockStateProperties.DRAG);
+                if (dragDownState == null) continue;
+                if (dragDownState) {
+                    if (BLOCK_DATA.isAir(World.getBlock(localState.x(), localState.y() + 1, localState.z()))) {
+                        velocity.setY(Math.max(-0.9, velocity.getY() - 0.03));
+                    } else {
+                        velocity.setY(Math.max(-0.3, velocity.getY() - 0.03));
+                    }
                 } else {
-                    velocity.setY(Math.max(-0.3, velocity.getY() - 0.03));
-                }
-            } else if (localState.id() == BlockRegistry.BUBBLE_COLUMN.maxStateId()) {
-                if (BLOCK_DATA.isAir(World.getBlock(localState.x(), localState.y() + 1, localState.z()))) {
-                    velocity.setY(Math.min(1.8, velocity.getY() + 0.1));
-                } else {
-                    velocity.setY(Math.min(0.7, velocity.getY() + 0.06));
+                    if (BLOCK_DATA.isAir(World.getBlock(localState.x(), localState.y() + 1, localState.z()))) {
+                        velocity.setY(Math.min(1.8, velocity.getY() + 0.1));
+                    } else {
+                        velocity.setY(Math.min(0.7, velocity.getY() + 0.06));
+                    }
                 }
             } else if (localState.block() == BlockRegistry.COBWEB) {
                 fallDistance = 0.0;
@@ -1340,6 +1352,18 @@ public final class Bot extends ModuleUtils {
         var attribute = CACHE.getPlayerCache().getThePlayer().getAttributes().get(attributeType);
         if (attribute == null) return defaultAttribute;
         return new Attribute(attribute.getType(), attribute.getValue(), Lists.newArrayList(attribute.getModifiers()));
+    }
+
+    private boolean canPlayerFitWithinBlocksAndEntitiesWhen(CollisionBox poseCb) {
+        var sneakingCb = new LocalizedCollisionBox(poseCb, x, y, z).inflate(-1.0E-7, -1.0E-7, -1.0E-7);
+        var levelCbs = World.getIntersectingCollisionBoxes(sneakingCb);
+        for (int i = 0; i < levelCbs.size(); i++) {
+            final var cb = levelCbs.get(i);
+            if (sneakingCb.intersects(cb)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     public double getEyeY() {

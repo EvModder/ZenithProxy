@@ -1,6 +1,7 @@
 package com.zenith.util.config;
 
 import com.zenith.util.Wait;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Field;
 
@@ -55,7 +56,7 @@ public final class ConfigVerifier {
                 if (!field.canAccess(obj)) continue;
                 Object value = field.get(obj);
                 if (value == null && !isNullableField(field)) {
-                    DEFAULT_LOG.error("Field: '{}' in '{}' is null", field.getName(), clazz.getName());
+                    DEFAULT_LOG.error("Field: '{}' in '{}' is null\nIf this is intended, annotate the field with: {}", field.getName(), clazz.getName(), Nullable.class.getName());
                     return true;
                 }
                 if (field.getType().getName().startsWith("com.zenith")
@@ -72,6 +73,6 @@ public final class ConfigVerifier {
     }
 
     private static boolean isNullableField(Field field) {
-        return field.isAnnotationPresent(ConfigNullable.class);
+        return field.getAnnotatedType().getAnnotation(Nullable.class) != null;
     }
 }

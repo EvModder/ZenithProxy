@@ -99,7 +99,7 @@ public class DiscordBot {
             handleProxyUpdateComplete();
         }
         this.presenceUpdateFuture = EXECUTOR.scheduleWithFixedDelay(
-            this::updatePresence, 0L,
+            this::tickPresence, 0L,
             15L, // discord rate limit
             TimeUnit.SECONDS);
     }
@@ -282,41 +282,44 @@ public class DiscordBot {
         return message.replaceAll("_", "\\\\_");
     }
 
-    void updatePresence() {
+    void tickPresence() {
         if (!isRunning()) return;
+        if (!CONFIG.discord.managePresence) return;
         try {
             if (LAUNCH_CONFIG.auto_update) {
                 final AutoUpdater autoUpdater = Proxy.getInstance().getAutoUpdater();
-                if (autoUpdater.getUpdateAvailable()
-                    && ThreadLocalRandom.current().nextDouble() < 0.25
-                ) {
+                if (autoUpdater.getUpdateAvailable() && ThreadLocalRandom.current().nextDouble() < 0.25) {
                     jda.getPresence().setPresence(
-                            OnlineStatus.ONLINE,
-                            Activity.customStatus("Update Available" + autoUpdater.getNewVersion().map(v -> ": " + v).orElse(""))
+                        Proxy.getInstance().isConnected()
+                            ? Proxy.getInstance().isInQueue() || MODULE.get(AutoReconnect.class).autoReconnectIsInProgress()
+                                ? OnlineStatus.IDLE
+                                : OnlineStatus.ONLINE
+                            : OnlineStatus.DO_NOT_DISTURB,
+                        Activity.customStatus("Update Available" + autoUpdater.getNewVersion().map(v -> ": " + v).orElse(""))
                     );
-                    return;
                 }
             }
             if (MODULE.get(AutoReconnect.class).autoReconnectIsInProgress()) {
                 jda.getPresence().setPresence(OnlineStatus.IDLE, Activity.customStatus("AutoReconnecting..."));
                 return;
             }
-            if (Proxy.getInstance().isInQueue())
+            if (Proxy.getInstance().isInQueue()) {
                 jda.getPresence().setPresence(OnlineStatus.IDLE, Activity.customStatus(Queue.queuePositionStr()));
-            else if (Proxy.getInstance().isConnected())
+            } else if (Proxy.getInstance().isConnected()) {
                 jda.getPresence().setPresence(
                     OnlineStatus.ONLINE,
                     Activity.customStatus((Proxy.getInstance().isOn2b2t() ? "2b2t" : CONFIG.client.server.address)
                                               + " [" + Proxy.getInstance().getOnlineTimeString() + "]"));
-            else
+            } else {
                 jda.getPresence().setPresence(OnlineStatus.DO_NOT_DISTURB, Activity.customStatus("Disconnected"));
+            }
         } catch (final Throwable e) {
             DISCORD_LOG.error("Failed updating discord presence. Check that the bot has correct permissions: {}", e.getMessage());
             DISCORD_LOG.debug("Failed updating discord presence. Check that the bot has correct permissions.", e);
         }
     }
 
-    public void updatePresence(final OnlineStatus onlineStatus, final Activity activity) {
+    public void setPresence(final OnlineStatus onlineStatus, final Activity activity) {
         if (!isRunning()) return;
         jda.getPresence().setPresence(onlineStatus, activity);
     }
@@ -329,7 +332,26 @@ public class DiscordBot {
             .orElse(false);
     }
 
-    public void updateProfileImage(final byte[] imageBytes) {
+    public void updateBotInfo() {
+        if (CONFIG.discord.manageNickname)
+            DISCORD.setBotNickname(CONFIG.authentication.username + " | ZenithProxy");
+        if (CONFIG.discord.manageDescription)
+            DISCORD.setBotDescription(
+                """
+                ZenithProxy %s
+                **Official Discord**:
+                  https://discord.gg/nJZrSaRKtb
+                **Github**:
+                  https://github.com/rfresh2/ZenithProxy
+                """.formatted(LAUNCH_CONFIG.version));
+    }
+
+    public void updateBotAvatar() {
+        if (CONFIG.discord.manageProfileImage)
+            DISCORD.setProfileImage(Proxy.getInstance().getServerIcon());
+    }
+
+    public void setProfileImage(final byte[] imageBytes) {
         if (!isRunning()) return;
         try {
             jda.getSelfUser().getManager().setAvatar(Icon.from(imageBytes)).complete();

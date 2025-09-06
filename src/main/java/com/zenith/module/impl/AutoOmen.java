@@ -7,12 +7,16 @@ import com.zenith.feature.inventory.InventoryActionRequest;
 import com.zenith.feature.player.ClickTarget;
 import com.zenith.feature.player.Input;
 import com.zenith.feature.player.InputRequest;
+import com.zenith.mc.block.Direction;
 import com.zenith.mc.item.ItemData;
 import com.zenith.mc.item.ItemRegistry;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TranslatableComponent;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.Effect;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.GameMode;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.player.PlayerAction;
 import org.geysermc.mcprotocollib.protocol.data.game.item.ItemStack;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundPlayerActionPacket;
 
 import java.util.List;
 
@@ -28,6 +32,8 @@ public class AutoOmen extends AbstractInventoryModule {
         Effect.RAID_OMEN,
         Effect.TRIAL_OMEN
     );
+    private long lastHadOmen = 0L;
+    private long lastRaidActive = 0L;
 
     public AutoOmen() {
         super(HandRestriction.EITHER, 3, MOVEMENT_PRIORITY);
@@ -47,9 +53,15 @@ public class AutoOmen extends AbstractInventoryModule {
     }
 
     public void handleClientTick(final ClientBotTick e) {
+        if (hasOmenEffect()) {
+            lastHadOmen = System.currentTimeMillis();
+        }
+        if (isRaidActive()) {
+            lastRaidActive = System.currentTimeMillis();
+        }
         if (CACHE.getPlayerCache().getThePlayer().isAlive()
-            && (CONFIG.client.extra.autoOmen.whileRaidActive || !isRaidActive())
-            && (CONFIG.client.extra.autoOmen.whileOmenActive || !hasOmenEffect())
+            && (CONFIG.client.extra.autoOmen.whileRaidActive || (System.currentTimeMillis() - lastRaidActive > CONFIG.client.extra.autoOmen.raidCooldownMs))
+            && (CONFIG.client.extra.autoOmen.whileOmenActive || (System.currentTimeMillis() - lastHadOmen > CONFIG.client.extra.autoOmen.omenCooldownMs))
             && CACHE.getPlayerCache().getGameMode() != GameMode.CREATIVE
             && CACHE.getPlayerCache().getGameMode() != GameMode.SPECTATOR
             && Proxy.getInstance().getOnlineTimeSeconds() > 1) {
@@ -65,6 +77,24 @@ public class AutoOmen extends AbstractInventoryModule {
                 startEating();
             }
         } else {
+            if (isEating) {
+                if (delay > 0) { // we got interrupted during drinking
+                    // todo: have bot automatically cancel eats if not confirmed every tick?
+                    sendClientPacketAsync(new ServerboundPlayerActionPacket(
+                        PlayerAction.RELEASE_USE_ITEM,
+                        0, 0, 0,
+                        Direction.DOWN.mcpl(),
+                        CACHE.getPlayerCache().getSeqId().incrementAndGet()
+                    ));
+                    debug("Got interrupted during omen drink");
+                    delay = 0;
+                } else {
+                    delay = 20;
+                    debug("Omen drink completed");
+                }
+            } else {
+                delay = 0;
+            }
             isEating = false;
         }
     }
@@ -88,6 +118,7 @@ public class AutoOmen extends AbstractInventoryModule {
                 .priority(MOVEMENT_PRIORITY)
                 .build())
             .addInputExecutedListener(future -> {
+                debug("Drinking Omen");
                 isEating = true;
                 delay = 50;
             });
@@ -115,12 +146,19 @@ public class AutoOmen extends AbstractInventoryModule {
 
     private boolean isRaidActive() {
         for (var bossBar : CACHE.getBossBarCache().getBossBars().values()) {
-            var titleComponents = bossBar.getTitle().children();
-            for (int i = 0; i < titleComponents.size(); i++) {
-                if (titleComponents.get(i) instanceof TranslatableComponent translatableComponent) {
-                    if (translatableComponent.key().startsWith("event.minecraft.raid")) {
-                        return true;
-                    }
+            if (isRaidActiveComponent(bossBar.getTitle())) return true;
+        }
+        return false;
+    }
+
+    private boolean isRaidActiveComponent(final Component component) {
+        if (component instanceof TranslatableComponent translatableComponent) {
+            var key = translatableComponent.key();
+            return key.startsWith("event.minecraft.raid") && !key.contains("victory");
+        } else {
+            for (var child : component.children()) {
+                if (isRaidActiveComponent(child)) {
+                    return true;
                 }
             }
         }

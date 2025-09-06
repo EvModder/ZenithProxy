@@ -8,6 +8,8 @@ import com.zenith.command.api.CommandUsage;
 import com.zenith.discord.Embed;
 import com.zenith.module.impl.AutoOmen;
 
+import static com.mojang.brigadier.arguments.IntegerArgumentType.getInteger;
+import static com.mojang.brigadier.arguments.IntegerArgumentType.integer;
 import static com.zenith.Globals.CONFIG;
 import static com.zenith.Globals.MODULE;
 import static com.zenith.command.brigadier.ToggleArgumentType.getToggle;
@@ -50,6 +52,16 @@ public class AutoOmenCommand extends Command {
                 CONFIG.client.extra.autoOmen.whileOmenActive = getToggle(c, "toggle");
                 c.getSource().getEmbed()
                     .title("AutoOmen While Omen Active " + toggleStrCaps(CONFIG.client.extra.autoOmen.whileOmenActive));
+            })))
+            .then(literal("raidCooldown").then(argument("ms", integer(1)).executes(c -> {
+                CONFIG.client.extra.autoOmen.raidCooldownMs = getInteger(c, "ms");
+                c.getSource().getEmbed()
+                    .title("Raid Cooldown Set");
+            })))
+            .then(literal("omenCooldown").then(argument("ms", integer(1)).executes(c -> {
+                CONFIG.client.extra.autoOmen.omenCooldownMs = getInteger(c, "ms");
+                c.getSource().getEmbed()
+                    .title("Omen Cooldown Set");
             })));
     }
 

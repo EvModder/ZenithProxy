@@ -12,6 +12,7 @@ import com.zenith.cache.DataCache;
 import com.zenith.command.CommandManager;
 import com.zenith.database.DatabaseManager;
 import com.zenith.discord.DiscordBot;
+import com.zenith.feature.gui.InGameGuiManager;
 import com.zenith.feature.inventory.InventoryManager;
 import com.zenith.feature.pathfinder.Baritone;
 import com.zenith.feature.player.Bot;
@@ -24,13 +25,16 @@ import com.zenith.mc.language.TranslationRegistryInitializer;
 import com.zenith.mc.map.MapBlockColorManager;
 import com.zenith.module.ModuleManager;
 import com.zenith.network.server.handler.player.InGameCommandManager;
+import com.zenith.plugin.DefaultGsonConfigSerializer;
 import com.zenith.plugin.PluginManager;
+import com.zenith.plugin.api.ConfigSerializer;
 import com.zenith.terminal.TerminalManager;
 import com.zenith.util.Wait;
 import com.zenith.util.config.Config;
 import com.zenith.util.config.ConfigVerifier;
 import com.zenith.util.config.LaunchConfig;
 import com.zenith.via.ZenithViaInitializer;
+import lombok.Locked;
 import net.kyori.adventure.text.logger.slf4j.ComponentLogger;
 import org.jspecify.annotations.Nullable;
 
@@ -82,8 +86,10 @@ public class Globals {
     public static final InventoryManager INVENTORY;
     public static final ZenithViaInitializer VIA_INITIALIZER;
     public static final PluginManager PLUGIN_MANAGER;
+    public static final InGameGuiManager GUI;
     public static final String MC_VERSION;
-    public static synchronized Config loadConfig() {
+    @Locked
+    public static Config loadConfig() {
         try {
             DEFAULT_LOG.info("Loading config...");
 
@@ -110,7 +116,8 @@ public class Globals {
         }
     }
 
-    public static synchronized LaunchConfig loadLaunchConfig() {
+    @Locked
+    public static LaunchConfig loadLaunchConfig() {
         try {
             DEFAULT_LOG.info("Loading launch config...");
 
@@ -167,15 +174,18 @@ public class Globals {
         Thread.ofVirtual().name("Async Config Save").start(Globals::saveConfig);
     }
 
-    public static synchronized void saveConfig() {
-        saveConfig(CONFIG_FILE, CONFIG, GSON);
+    @Locked
+    public static void saveConfig() {
+        saveConfig(CONFIG_FILE, CONFIG, DefaultGsonConfigSerializer.INSTANCE);
         PLUGIN_MANAGER.saveConfigs(Globals::saveConfig);
     }
-    public static synchronized void saveLaunchConfig() {
-        saveConfig(LAUNCH_CONFIG_FILE, LAUNCH_CONFIG, GSON);
+    @Locked
+    public static void saveLaunchConfig() {
+        saveConfig(LAUNCH_CONFIG_FILE, LAUNCH_CONFIG, DefaultGsonConfigSerializer.INSTANCE);
     }
 
-    static void saveConfig(File file, Object config, Gson gson) {
+    @Locked
+    static void saveConfig(File file, Object config, ConfigSerializer serializer) {
         DEFAULT_LOG.debug("Saving {}...", file.getName());
 
         if (config == null) {
@@ -186,7 +196,7 @@ public class Globals {
         try {
             final File tempFile = File.createTempFile(file.getName(), null);
             try (Writer out = new FileWriter(tempFile)) {
-                gson.toJson(config, out);
+                serializer.write(config, out);
             }
             Files.move(tempFile, file);
         } catch (IOException e) {
@@ -234,6 +244,7 @@ public class Globals {
             PLAYER_LISTS.init(); // must be init after config
             BOT = new Bot();
             BARITONE = new Baritone();
+            GUI = new InGameGuiManager();
         } catch (final Throwable e) {
             DEFAULT_LOG.error("Unable to initialize!", e);
             throw e;

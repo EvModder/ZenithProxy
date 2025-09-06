@@ -5,14 +5,21 @@ import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import com.zenith.Proxy;
 import com.zenith.command.api.*;
 import com.zenith.discord.Embed;
+import com.zenith.feature.gui.GuiBuilder;
+import com.zenith.feature.gui.SlotBuilder;
+import com.zenith.feature.gui.elements.Slot;
+import com.zenith.mc.item.ItemRegistry;
 import com.zenith.network.server.ServerSession;
 import com.zenith.util.config.Config.Server.Extra.ServerSwitcher.ServerSwitcherServer;
+import net.kyori.adventure.text.Component;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 import static com.mojang.brigadier.arguments.IntegerArgumentType.getInteger;
 import static com.mojang.brigadier.arguments.IntegerArgumentType.integer;
 import static com.zenith.Globals.CONFIG;
+import static com.zenith.Globals.GUI;
 import static com.zenith.command.brigadier.CustomStringArgumentType.getString;
 import static com.zenith.command.brigadier.CustomStringArgumentType.wordWithChars;
 
@@ -30,6 +37,7 @@ public class ServerSwitcherCommand extends Command {
             Servers being switched to must have transfers enabled and be on an MC version >=1.20.6
             """)
             .usageLines(
+                "",
                 "register <name> <address> <port>",
                 "list",
                 "<name>"
@@ -40,6 +48,42 @@ public class ServerSwitcherCommand extends Command {
     @Override
     public LiteralArgumentBuilder<CommandContext> register() {
         return command("switch")
+            .executes(c -> {
+                if (c.getSource().getSource() != CommandSources.PLAYER || c.getSource().getInGamePlayerInfo() == null) {
+                    c.getSource().getEmbed()
+                        .title("Only in-game controlling players can use this command")
+                        .errorColor();
+                    return ERROR;
+                }
+                var session = c.getSource().getInGamePlayerInfo().session();
+                if (session.getProtocolVersion().olderThan(ProtocolVersion.v1_20_5)) {
+                    c.getSource().getEmbed()
+                        .title("Unsupported Client MC Version")
+                        .description("Unsupported Client MC version. Must be at least 1.20.6");
+                    return ERROR;
+                }
+                c.getSource().setNoOutput(true);
+                var serversList = CONFIG.server.extra.serverSwitcher.servers;
+                List<Slot> slots = serversList.stream()
+                    .map(server ->
+                        SlotBuilder.create()
+                            // consistent random item per server
+                            .item(ItemRegistry.REGISTRY.get(Math.abs(server.name().hashCode() % 300) + 1))
+                            .name(Component.text(server.name()))
+                            .buttonClickHandler((button, gui, page, event) -> {
+                                if (!event.isLeftClick()) return;
+                                gui.session().transfer(server.address(), server.port());
+                            })
+                            .build())
+                    .toList();
+
+                var gui = GuiBuilder.create()
+                    .session(c.getSource().getInGamePlayerInfo().session())
+                    .paginateList(Component.text("Server Switcher"), slots)
+                    .build();
+                GUI.open(gui);
+                return OK;
+            })
             .then(literal("register")
                 .then(argument("name", wordWithChars())
                     .then(argument("address", wordWithChars())

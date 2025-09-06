@@ -17,6 +17,7 @@ import static com.github.rfresh2.EventConsumer.of;
 import static com.zenith.Globals.*;
 
 public class ConnectionsDatabase extends LiveDatabase {
+    public static final int DISCONNECT_PRIORITY = 10;
     public ConnectionsDatabase(final QueryExecutor queryExecutor, final RedisClient redisClient) {
         super(queryExecutor, redisClient);
     }
@@ -27,7 +28,7 @@ public class ConnectionsDatabase extends LiveDatabase {
             this,
             of(ServerPlayerConnectedEvent.class, this::handleServerPlayerConnectedEvent),
             of(ServerPlayerDisconnectedEvent.class, this::handleServerPlayerDisconnectedEvent),
-            of(ClientDisconnectEvent.class, 10, this::handleDisconnectEvent) // higher priority before cache is reset
+            of(ClientDisconnectEvent.class, DISCONNECT_PRIORITY, this::handleDisconnectEvent) // higher priority before cache is reset
         );
     }
 

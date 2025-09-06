@@ -4,6 +4,7 @@ import com.github.rfresh2.EventConsumer;
 import com.zenith.network.codec.PacketCodecRegistries;
 import com.zenith.network.codec.PacketHandlerCodec;
 import lombok.Getter;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.List;
@@ -16,8 +17,8 @@ import static com.zenith.Globals.EVENT_BUS;
 @Getter
 public abstract class Module extends ModuleUtils {
     boolean enabled = false;
-    PacketHandlerCodec clientPacketHandlerCodec = null;
-    PacketHandlerCodec serverPacketHandlerCodec = null;
+    @Nullable PacketHandlerCodec clientPacketHandlerCodec = null;
+    @Nullable PacketHandlerCodec serverPacketHandlerCodec = null;
 
     public Module() {}
 
@@ -92,11 +93,11 @@ public abstract class Module extends ModuleUtils {
         EVENT_BUS.unsubscribe(this);
     }
 
-    public PacketHandlerCodec registerClientPacketHandlerCodec() {
+    public @Nullable PacketHandlerCodec registerClientPacketHandlerCodec() {
         return null;
     }
 
-    public PacketHandlerCodec registerServerPacketHandlerCodec() {
+    public @Nullable PacketHandlerCodec registerServerPacketHandlerCodec() {
         return null;
     }
 }

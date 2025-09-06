@@ -8,7 +8,6 @@ import com.zenith.feature.spectator.SpectatorSync;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundRemoveEntitiesPacket;
 
 import static com.mojang.brigadier.arguments.StringArgumentType.getString;
-import static com.mojang.brigadier.arguments.StringArgumentType.word;
 import static com.zenith.util.ComponentSerializer.minimessage;
 
 public class SpectatorEntityCommand extends Command {
@@ -34,7 +33,7 @@ public class SpectatorEntityCommand extends Command {
                 session.sendAsyncMessage(minimessage("<red>Entity id's: " + String.join(", ", SpectatorEntityRegistry.getEntityIdentifiers())));
                 c.getSource().setNoOutput(true);
             })
-            .then(argument("entity", word()).executes(c -> {
+            .then(argument("entity", enumStrings(SpectatorEntityRegistry.getEntityIdentifiers())).executes(c -> {
                 String entityId = getString(c, "entity");
                 var session = c.getSource().getInGamePlayerInfo().session();
                 boolean spectatorEntitySet = session.setSpectatorEntity(entityId);

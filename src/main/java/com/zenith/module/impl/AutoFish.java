@@ -14,7 +14,6 @@ import com.zenith.feature.player.*;
 import com.zenith.mc.item.ItemRegistry;
 import com.zenith.network.codec.PacketHandlerCodec;
 import com.zenith.network.codec.PacketHandlerStateCodec;
-import com.zenith.network.codec.PacketLogPacketHandlerCodec;
 import com.zenith.util.math.MathHelper;
 import org.geysermc.mcprotocollib.protocol.data.ProtocolState;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.EquipmentSlot;
@@ -61,7 +60,7 @@ public class AutoFish extends AbstractInventoryModule {
 
     @Override
     public PacketHandlerCodec registerClientPacketHandlerCodec() {
-        return PacketLogPacketHandlerCodec.clientBuilder()
+        return PacketHandlerCodec.clientBuilder()
             .setId("autofish")
             .setPriority(-5) // after standard client packet handlers
             .state(ProtocolState.GAME, PacketHandlerStateCodec.clientBuilder()

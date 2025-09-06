@@ -20,6 +20,8 @@ import java.util.List;
 import java.util.OptionalInt;
 import java.util.Queue;
 
+import static com.zenith.Globals.SERVER_LOG;
+
 /**
  * Converts between Zenith's native Brigadier commands and the MCProtocolLib intermediary packet format
  */
@@ -35,10 +37,10 @@ public class BrigadierToMCProtocolLibConverter {
 
     private CommandType convertCommandType(com.mojang.brigadier.tree.CommandNode node) {
         return switch (node) {
-            case RootCommandNode rootCommandNode -> CommandType.ROOT;
-            case LiteralCommandNode literalCommandNode -> CommandType.LITERAL;
-            case ArgumentCommandNode argumentCommandNode -> CommandType.ARGUMENT;
-            case null, default -> throw new RuntimeException("No valid command type found for node: " + node.getName());
+            case RootCommandNode n -> CommandType.ROOT;
+            case LiteralCommandNode n -> CommandType.LITERAL;
+            case ArgumentCommandNode n -> CommandType.ARGUMENT;
+            case null, default -> throw new RuntimeException("No valid command type found for node: " + (node == null ? "?" : node.getName()));
         };
     }
 
@@ -84,72 +86,46 @@ public class BrigadierToMCProtocolLibConverter {
         }
         CommandParser parser = null;
         CommandProperties properties = null;
-
+        String suggestionType = null;
         if (node instanceof ArgumentCommandNode<CommandContext,?> argumentNode) {
             switch (argumentNode.getType()) {
-                case CustomStringArgumentType t -> {
-                    parser = CommandParser.STRING;
-                    properties = StringProperties.SINGLE_WORD;
+                case SerializableArgumentType t -> {
+                    parser = t.commandParser();
+                    properties = t.commandProperties();
+                    if (t.askServerForSuggestions()) {
+                        suggestionType = "minecraft:ask_server";
+                    }
                 }
-                case StringArgumentType sa -> {
+                case BoolArgumentType t -> {
+                    parser = CommandParser.BOOL;
+                }
+                case DoubleArgumentType t -> {
+                    parser = CommandParser.DOUBLE;
+                    properties = new DoubleProperties(t.getMinimum(), t.getMaximum());
+                }
+                case FloatArgumentType t -> {
+                    parser = CommandParser.FLOAT;
+                    properties = new FloatProperties(t.getMinimum(), t.getMaximum());
+                }
+                case LongArgumentType t -> {
+                    parser = CommandParser.LONG;
+                    properties = new LongProperties(t.getMinimum(), t.getMaximum());
+                }
+                case IntegerArgumentType t -> {
+                    parser = CommandParser.INTEGER;
+                    properties = new IntegerProperties(t.getMinimum(), t.getMaximum());
+                }
+                case StringArgumentType t -> {
                     parser = CommandParser.STRING;
-                    properties = switch (sa.getType()) {
+                    properties = switch (t.getType()) {
                         case StringArgumentType.StringType.SINGLE_WORD -> StringProperties.SINGLE_WORD;
                         case StringArgumentType.StringType.GREEDY_PHRASE -> StringProperties.GREEDY_PHRASE;
                         case StringArgumentType.StringType.QUOTABLE_PHRASE -> StringProperties.QUOTABLE_PHRASE;
                     };
                 }
-                case EnumStringArgumentType t -> {
-                    parser = CommandParser.STRING;
-                    properties = StringProperties.SINGLE_WORD;
+                default -> {
+                    SERVER_LOG.error("Unable to serialize unknown command argument type: {} : {}", argumentNode.getType(), name);
                 }
-                case ToggleArgumentType t -> {
-                    parser = CommandParser.BOOL;
-                }
-                case BoolArgumentType t -> {
-                    parser = CommandParser.BOOL;
-                }
-                case DoubleArgumentType dt -> {
-                    parser = CommandParser.DOUBLE;
-                    properties = new DoubleProperties(dt.getMinimum(), dt.getMaximum());
-                }
-                case FloatArgumentType ft -> {
-                    parser = CommandParser.FLOAT;
-                    properties = new FloatProperties(ft.getMinimum(), ft.getMaximum());
-                }
-                case LongArgumentType lt -> {
-                    parser = CommandParser.LONG;
-                    properties = new LongProperties(lt.getMinimum(), lt.getMaximum());
-                }
-                case IntegerArgumentType it -> {
-                    parser = CommandParser.INTEGER;
-                    properties = new IntegerProperties(it.getMinimum(), it.getMaximum());
-                }
-                case BlockPosArgument it -> {
-                    parser = CommandParser.BLOCK_POS;
-                }
-                case RotationArgument it -> {
-                    parser = CommandParser.ROTATION;
-                }
-                case Vec2Argument it -> {
-                    parser = CommandParser.VEC2;
-                }
-                case Vec3Argument it -> {
-                    parser = CommandParser.VEC3;
-                }
-                case ItemArgument it -> {
-                    parser = CommandParser.ITEM_STACK;
-                }
-                case DimensionArgument it -> {
-                    parser = CommandParser.DIMENSION;
-                }
-                case BlockArgument it -> {
-                    parser = CommandParser.BLOCK_STATE;
-                }
-                case ResourceLocationArgument it -> {
-                    parser = CommandParser.RESOURCE_LOCATION;
-                }
-                default -> {}
             }
         }
         return new CommandNode(
@@ -160,7 +136,7 @@ public class BrigadierToMCProtocolLibConverter {
             name,
             parser,
             properties,
-            null // means the client should never ask for suggestions from the server
+            suggestionType // if null, the client should never ask for suggestions from the server
         );
     }
 }

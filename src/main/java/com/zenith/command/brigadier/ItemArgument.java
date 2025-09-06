@@ -2,20 +2,25 @@ package com.zenith.command.brigadier;
 
 import com.mojang.brigadier.LiteralMessage;
 import com.mojang.brigadier.StringReader;
-import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
+import com.mojang.brigadier.suggestion.Suggestions;
+import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.zenith.mc.item.ItemData;
 import com.zenith.mc.item.ItemRegistry;
 import lombok.Data;
+import org.geysermc.mcprotocollib.protocol.data.game.command.CommandParser;
+import org.jspecify.annotations.NonNull;
+
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Does not support the full vanilla item arg syntax with data components like `minecraft:stone{Count:1b}`
  * only supports parsing from an item name
  */
 @Data
-public class ItemArgument implements ArgumentType<ItemData> {
+public class ItemArgument implements SerializableArgumentType<ItemData> {
     public static final SimpleCommandExceptionType INVALID_ITEM_EXCEPTION = new SimpleCommandExceptionType(
         new LiteralMessage("Invalid item")
     );
@@ -65,5 +70,15 @@ public class ItemArgument implements ArgumentType<ItemData> {
         return c >= 'A' && c <= 'Z'
             || c >= 'a' && c <= 'z'
             || c == '_' || c == ':';
+    }
+
+    @Override
+    public @NonNull CommandParser commandParser() {
+        return CommandParser.ITEM_STACK;
+    }
+
+    @Override
+    public CompletableFuture<Suggestions> listSuggestions(final com.mojang.brigadier.context.CommandContext context, final SuggestionsBuilder builder) {
+        return RegistryDataArgument.listRegistrySuggestions(context, builder, ItemRegistry.REGISTRY);
     }
 }

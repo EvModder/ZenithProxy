@@ -9,6 +9,7 @@ import com.zenith.command.brigadier.EnumStringArgumentType;
 import com.zenith.command.brigadier.ZRequiredArgumentBuilder;
 import com.zenith.discord.Embed;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Predicate;
@@ -73,15 +74,15 @@ public abstract class Command {
     }
 
     public static EnumStringArgumentType enumStrings(String... strings) {
-        return new EnumStringArgumentType(strings);
+        return EnumStringArgumentType.enumStrings(strings);
+    }
+
+    public static EnumStringArgumentType enumStrings(Collection<String> strings) {
+        return EnumStringArgumentType.enumStrings(strings);
     }
 
     public static EnumStringArgumentType enumStrings(Enum<?>[] enumValues) {
-        String[] names = new String[enumValues.length];
-        for (int i = 0; i < enumValues.length; i++) {
-            names[i] = enumValues[i].name().toLowerCase();
-        }
-        return enumStrings(names);
+        return EnumStringArgumentType.enumStrings(enumValues);
     }
 
     public static String toggleStr(boolean state) {
@@ -103,10 +104,17 @@ public abstract class Command {
     public abstract LiteralArgumentBuilder<CommandContext> register();
 
     /**
-     * Override to populate the embed builder after every execution, including both success and error cases.
+     * Override to populate the embed builder after every non-throwing execution, including both success and error cases.
      * Don't include sensitive info, there is no permission validation.
      */
     public void defaultEmbed(final Embed builder) {}
+
+    /**
+     * Called after every non-throwing execution, including both successes and error cases, overridable.
+     */
+    public void defaultHandler(final CommandContext context) {
+        defaultEmbed(context.getEmbed());
+    }
 
     public CaseInsensitiveLiteralArgumentBuilder<CommandContext> command(String literal) {
         return literal(literal)
@@ -133,7 +141,7 @@ public abstract class Command {
     }
 
     public void defaultSuccessHandler(CommandContext context) {
-        defaultEmbed(context.getEmbed());
+        defaultHandler(context);
     }
 
     public void defaultErrorHandler(Map<CommandNode<CommandContext>, CommandSyntaxException> exceptions, CommandContext context) {
@@ -141,7 +149,7 @@ public abstract class Command {
             .findFirst()
             .ifPresent(exception -> context.getEmbed()
                 .addField("Error", exception.getMessage(), false));
-        defaultEmbed(context.getEmbed());
+        defaultHandler(context);
         if (!context.getEmbed().isTitlePresent()) {
             context.getEmbed()
                 .title("Invalid command usage");
@@ -152,7 +160,7 @@ public abstract class Command {
     }
 
     public void defaultExecutionErrorHandler(CommandContext commandContext) {
-        defaultEmbed(commandContext.getEmbed());
+        defaultHandler(commandContext);
         commandContext.getEmbed()
             .errorColor();
     }

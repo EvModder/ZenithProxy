@@ -8,6 +8,7 @@ import com.zenith.feature.inventory.actions.SetHeldItem;
 import com.zenith.util.RequestFuture;
 import com.zenith.util.timer.Timer;
 import com.zenith.util.timer.Timers;
+import org.jspecify.annotations.NullMarked;
 
 import java.util.Collections;
 
@@ -15,7 +16,10 @@ import static com.github.rfresh2.EventConsumer.of;
 import static com.zenith.Globals.*;
 import static java.util.Objects.requireNonNullElse;
 
+@NullMarked
 public class InventoryManager {
+    // after modules and InputManager, before player simulation
+    public static final int TICK_PRIORITY = -5000;
     private static final InventoryActionRequest DEFAULT_ACTION_REQUEST = new InventoryActionRequest(new Object(), Collections.emptyList(), Integer.MIN_VALUE, null);
     private static final RequestFuture DEFAULT_REQUEST_FUTURE = new RequestFuture();
     private final Timer tickTimer = Timers.tickTimer();
@@ -25,13 +29,16 @@ public class InventoryManager {
     public InventoryManager() {
         EVENT_BUS.subscribe(
             this,
-            // after modules, before player simulation
-            of(ClientBotTick.class, -5000, this::handleTick)
+            of(ClientBotTick.class, TICK_PRIORITY, this::handleTick)
         );
     }
 
+    /**
+     * Requests inventory actions to be executed at the end of the current tick, and subsequent ticks if applicable
+     */
     public synchronized RequestFuture submit(final InventoryActionRequest actionRequest) {
-        if (actionRequest.getPriority() <= currentActionRequest.getPriority()) return RequestFuture.rejected;
+        if (actionRequest.getPriority() <= currentActionRequest.getPriority() && hasActiveRequest())
+            return RequestFuture.rejected;
         if (currentActionRequest.isExecuting()) return RequestFuture.rejected;
         currentRequestFuture.complete(false);
         currentActionRequest = actionRequest;

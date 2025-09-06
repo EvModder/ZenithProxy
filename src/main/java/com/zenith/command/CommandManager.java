@@ -3,14 +3,15 @@ package com.zenith.command;
 import com.google.common.collect.Lists;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.ParseResults;
+import com.mojang.brigadier.StringReader;
 import com.mojang.brigadier.context.ParsedCommandNode;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import com.mojang.brigadier.suggestion.Suggestion;
+import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.zenith.command.api.Command;
 import com.zenith.command.api.CommandCategory;
 import com.zenith.command.api.CommandContext;
-import com.zenith.command.api.CommandSources;
+import com.zenith.command.api.CommandSource;
 import com.zenith.command.brigadier.BrigadierToMCProtocolLibConverter;
 import com.zenith.command.brigadier.CaseInsensitiveLiteralCommandNode;
 import com.zenith.command.impl.*;
@@ -19,10 +20,8 @@ import org.geysermc.mcprotocollib.protocol.data.game.command.CommandNode;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.util.stream.Collectors;
+import java.util.concurrent.CompletableFuture;
 
-import static com.zenith.Globals.TERMINAL_LOG;
 import static com.zenith.Globals.saveConfigAsync;
 import static java.util.Arrays.asList;
 
@@ -179,7 +178,7 @@ public class CommandManager {
     private String downcaseFirstWord(final String sentence) {
         List<String> words = asList(sentence.split(" "));
         if (words.size() > 1) {
-            return words.getFirst().toLowerCase() + words.stream().skip(1).collect(Collectors.joining(" ", " ", ""));
+            return words.getFirst().toLowerCase() + sentence.substring(words.getFirst().length());
         } else {
             return sentence.toLowerCase();
         }
@@ -220,16 +219,12 @@ public class CommandManager {
         }
     }
 
-    public List<String> getCommandCompletions(final String input) {
-        final ParseResults<CommandContext> parse = this.dispatcher.parse(downcaseFirstWord(input), CommandContext.create(input, CommandSources.TERMINAL));
-        try {
-            var suggestions = this.dispatcher.getCompletionSuggestions(parse).get(2L, TimeUnit.SECONDS);
-            return suggestions.getList().stream()
-                .map(Suggestion::getText)
-                .toList();
-        } catch (final Exception e) {
-            TERMINAL_LOG.warn("Failed to get command completions for input: {}", input);
-            return List.of();
+    public CompletableFuture<Suggestions> suggestions(final String input, CommandSource commandSource) {
+        var stringReader = new StringReader(downcaseFirstWord(input));
+        if (stringReader.canRead() && stringReader.peek() == '/') {
+            stringReader.skip();
         }
+        final ParseResults<CommandContext> parse = this.dispatcher.parse(stringReader, CommandContext.create(input, commandSource));
+        return this.dispatcher.getCompletionSuggestions(parse);
     }
 }

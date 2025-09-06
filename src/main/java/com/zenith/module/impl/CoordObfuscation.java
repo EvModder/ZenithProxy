@@ -530,11 +530,11 @@ public class CoordObfuscation extends Module {
     }
 
     @Override
-    public void disconnect(ServerSession session, String reason) {
+    public void disconnect(ServerSession session, String minimessage) {
         if (session.isDisconnected()) return; // already disconnected
-        disconnectNotif(session, reason);
+        disconnectNotif(session, minimessage);
         delayIncomingLogins();
-        super.disconnect(session, reason);
+        super.disconnect(session, minimessage);
     }
 
     private void disconnectNotif(final ServerSession session, final String reason) {

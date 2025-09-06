@@ -13,7 +13,6 @@ import com.zenith.feature.player.World;
 import com.zenith.mc.block.Block;
 import com.zenith.mc.block.BlockPos;
 import com.zenith.mc.entity.EntityData;
-import com.zenith.mc.entity.EntityRegistry;
 import com.zenith.mc.item.ItemData;
 import com.zenith.util.math.MathHelper;
 
@@ -35,6 +34,8 @@ import static com.zenith.command.brigadier.CustomStringArgumentType.getString;
 import static com.zenith.command.brigadier.CustomStringArgumentType.wordWithChars;
 import static com.zenith.command.brigadier.ItemArgument.getItem;
 import static com.zenith.command.brigadier.ItemArgument.item;
+import static com.zenith.command.brigadier.RegistryDataArgument.entity;
+import static com.zenith.command.brigadier.RegistryDataArgument.getEntity;
 import static com.zenith.command.brigadier.ToggleArgumentType.getToggle;
 import static com.zenith.command.brigadier.ToggleArgumentType.toggle;
 import static com.zenith.command.brigadier.Vec2Argument.getVec2;
@@ -325,16 +326,9 @@ public class PathfinderCommand extends Command {
                             .primaryColor();
                     }))
                     .then(literal("entity")
-                        .then(argument("type", wordWithChars()).executes(c -> {
-                            String entityType = getString(c, "type");
-                            EntityData entityData = EntityRegistry.REGISTRY.get(entityType.toLowerCase().trim());
-                            if (entityData == null) {
-                                c.getSource().getEmbed()
-                                    .title("Error")
-                                    .description("Entity not found: " + entityType)
-                                    .errorColor();
-                                return OK;
-                            }
+                        .then(argument("type", entity()).executes(c -> {
+                            EntityData entityData = getEntity(c, "type");
+                            String entityType = entityData.name();
                             var entityOptional = CACHE.getEntityCache().getEntities().values().stream()
                                 .filter(e -> e instanceof EntityLiving)
                                 .map(e -> (EntityLiving) e)
@@ -428,16 +422,9 @@ public class PathfinderCommand extends Command {
                             .primaryColor();
                     }))
                     .then(literal("entity")
-                        .then(argument("type", wordWithChars()).executes(c -> {
-                            String entityType = getString(c, "type");
-                            EntityData entityData = EntityRegistry.REGISTRY.get(entityType.toLowerCase().trim());
-                            if (entityData == null) {
-                                c.getSource().getEmbed()
-                                    .title("Error")
-                                    .description("Entity not found: " + entityType)
-                                    .errorColor();
-                                return OK;
-                            }
+                        .then(argument("type", entity()).executes(c -> {
+                            EntityData entityData = getEntity(c, "type");
+                            String entityType = entityData.name();
                             var entityOptional = CACHE.getEntityCache().getEntities().values().stream()
                                 .filter(e -> e instanceof EntityLiving)
                                 .map(e -> (EntityLiving) e)

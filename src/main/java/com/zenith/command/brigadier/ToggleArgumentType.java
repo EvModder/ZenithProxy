@@ -2,17 +2,18 @@ package com.zenith.command.brigadier;
 
 import com.mojang.brigadier.LiteralMessage;
 import com.mojang.brigadier.StringReader;
-import com.mojang.brigadier.arguments.ArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.DynamicCommandExceptionType;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
+import org.geysermc.mcprotocollib.protocol.data.game.command.CommandParser;
+import org.jspecify.annotations.NonNull;
 
 import java.util.concurrent.CompletableFuture;
 
-public class ToggleArgumentType implements ArgumentType<Boolean> {
+public class ToggleArgumentType implements SerializableArgumentType<Boolean> {
 
     private static final SimpleCommandExceptionType READER_EXPECTED_ON_OFF = new SimpleCommandExceptionType(new LiteralMessage("Expected on/off"));
     private static final DynamicCommandExceptionType READER_INVALID_ON_OFF = new DynamicCommandExceptionType(value -> new LiteralMessage("Invalid on/off, found '" + value + "'"));
@@ -52,5 +53,10 @@ public class ToggleArgumentType implements ArgumentType<Boolean> {
             builder.suggest("off");
         }
         return builder.buildFuture();
+    }
+
+    @Override
+    public @NonNull CommandParser commandParser() {
+        return CommandParser.BOOL;
     }
 }
