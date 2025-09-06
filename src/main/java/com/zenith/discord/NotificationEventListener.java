@@ -304,6 +304,11 @@ public class NotificationEventListener {
 
     public void handleProxyClientConnectedEvent(PlayerConnectedEvent event) {
         if (!CONFIG.discord.clientConnectionMessages) return;
+
+        //TODO: config setting to enable hiding connection msgs for friend-list/connection-list/other-list
+        if (PLAYER_LISTS.getFriendsList().contains(event.clientGameProfile())
+            && PLAYER_LISTS.getSpectatorWhitelist().contains(event.clientGameProfile())) return;
+
         var embed = Embed.builder()
             .title(event.clientGameProfile().getName()+" connected to "+CONFIG.authentication.username+"-Proxy")
             // .title(CONFIG.authentication.username+"-Proxy connected")
