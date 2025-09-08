@@ -173,9 +173,9 @@ public class NotificationEventListener {
         var category = DisconnectReasonInfo.getDisconnectCategory(event.reason());
         var embed = Embed.builder()
             .title(CONFIG.authentication.username+" disconnected")
-            .addField("Reason", event.reason(), false)
+            .addField(/*Server-given reason*/"Reason", event.reason(), false)
             // .addField("Why?", category.getWikiURL(), false)//TODO: config option
-            .addField("Category", category.toString(), false)
+            // .addField("Category", category.toString(), false) //TODO: config option
             .addField("Online Duration", formatDuration(event.onlineDurationWithQueueSkip()), false)
             .errorColor();
         if (Proxy.getInstance().isOn2b2t()
@@ -191,7 +191,6 @@ public class NotificationEventListener {
             } else if (event.wasInQueue() && event.queuePosition() <= 1) {
                 embed.description("""
                       You have likely been kicked due to being IP banned by 2b2t.
-                      
                       To check, try connecting and waiting through queue with the same account from a different IP.
                       """);
             } else if (!event.wasInQueue()
@@ -201,7 +200,6 @@ public class NotificationEventListener {
                     30L)) {
                 embed.description("""
                         You have likely been kicked for reaching the non-prio session time limit.
-                        
                         2b2t kicks non-prio players after %s hours online.
                         """.formatted(MODULE.get(SessionTimeLimit.class).getSessionTimeLimit().toHours()));
             } else if (!event.wasInQueue()
@@ -374,6 +372,11 @@ public class NotificationEventListener {
 
     public void handleProxyClientDisconnectedEvent(PlayerDisconnectedEvent event) {
         if (!CONFIG.discord.clientConnectionMessages) return;
+
+        //TODO: config setting to enable hiding connection msgs for friend-list/connection-list/other-list
+        if (PLAYER_LISTS.getFriendsList().contains(event.clientGameProfile())
+            && PLAYER_LISTS.getSpectatorWhitelist().contains(event.clientGameProfile())) return;
+
         var embed = Embed.builder()
             .title(
                 (nonNull(event.clientGameProfile()) ? event.clientGameProfile().getName() : "null")+" disconnected from "+CONFIG.authentication.username+"-Proxy")
