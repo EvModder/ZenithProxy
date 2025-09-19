@@ -147,7 +147,7 @@ public class NotificationEventListener {
             .title(CONFIG.authentication.username+" connected")
             .inQueueColor()
             .addField("Server", CONFIG.client.server.address, true)
-            .addField("Proxy IP", CONFIG.server.getProxyAddress(), false);
+            // .addField("Proxy IP", CONFIG.server.getProxyAddress(), false); // TODO: config option
         if (CONFIG.discord.mentionRoleOnConnect) {
             sendEmbedMessage(notificationMention(), embed);
         } else {
@@ -255,6 +255,8 @@ public class NotificationEventListener {
             .inQueueColor()
             .addField("Regular Queue", Queue.getQueueStatus().regular(), true)
             .addField("Priority Queue", Queue.getQueueStatus().prio(), true);
+        
+        if(!event.wasOnline()) return; // TODO: config option
         if (event.wasOnline()) {
             embed
                 .addField("Info", "Kicked to queue", false)
