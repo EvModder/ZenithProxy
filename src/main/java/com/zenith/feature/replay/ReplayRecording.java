@@ -16,6 +16,7 @@ import org.geysermc.mcprotocollib.protocol.data.ProtocolState;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.PlayerSpawnInfo;
 import org.geysermc.mcprotocollib.protocol.packet.common.clientbound.ClientboundCustomPayloadPacket;
 import org.geysermc.mcprotocollib.protocol.packet.configuration.clientbound.ClientboundFinishConfigurationPacket;
+import org.geysermc.mcprotocollib.protocol.packet.configuration.clientbound.ClientboundUpdateEnabledFeaturesPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundLoginPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundRespawnPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.inventory.ServerboundContainerClickPacket;
@@ -160,7 +161,12 @@ public class ReplayRecording implements Closeable {
         }
     }
 
-    private synchronized void writeToFile(final long time, final MinecraftPacket packet, final Session session, final ProtocolState protocolState) {
+    private synchronized void writeToFile(final long time, MinecraftPacket packet, final Session session, final ProtocolState protocolState) {
+        if (!CONFIG.client.extra.replayMod.featureFlags) {
+            if (packet instanceof ClientboundUpdateEnabledFeaturesPacket) {
+                packet = new ClientboundUpdateEnabledFeaturesPacket(new String[]{"minecraft:vanilla"});
+            }
+        }
         int t = time == 0 ? 0 : (int) (time - startT);
         if (t == 0) startT = System.currentTimeMillis();
         final ByteBuf packetBuf = ALLOC.heapBuffer();
