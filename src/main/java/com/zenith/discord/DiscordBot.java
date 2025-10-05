@@ -338,15 +338,21 @@ public class DiscordBot {
 
     public void updateBotInfo() {
         updateBotNickname();
-        if (CONFIG.discord.manageDescription)
-            var oldDesc = jda.getApplicationManager().getDescription();
+        if (CONFIG.discord.manageDescription){
+            String oldDesc = jda.retrieveApplicationInfo().complete().getDescription();
             int s = oldDesc.indexOf("Online:"), e = oldDesc.indexOf("GitHub:");
             String nameList = "";
-            if(s != -1 && e != -1) nameList = oldDesc.substring(i+7, e).replaceAll("\\s+", "");
+            if(s != -1 && e != -1) nameList = oldDesc.substring(s+7, e).replaceAll("\\s+", "");
             if(!nameList.contains(CONFIG.authentication.username)){
                 if(!nameList.isEmpty()) nameList += ",";
                 nameList += CONFIG.authentication.username;
             }
+            // jda.retrieveApplicationInfo().queue(applicationInfo -> {
+            //     String description = applicationInfo.getDescription();
+            //     System.out.println("Bot Description: " + description);
+            // }, throwable -> {
+            //     System.err.println("Error retrieving application info: " + throwable.getMessage());
+            // });
             DISCORD.setBotDescription(
                 """
                 **Online:**
