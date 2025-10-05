@@ -143,16 +143,18 @@ public class NotificationEventListener {
     }
 
     public void handleConnectEvent(ClientConnectEvent event) {
-        var embed = Embed.builder()
+        // TODO: config option
+        /*var embed = Embed.builder()
             .title(CONFIG.authentication.username+" connected")
             .inQueueColor()
             .addField("Server", CONFIG.client.server.address, true)
-            // .addField("Proxy IP", CONFIG.server.getProxyAddress(), false); // TODO: config option
+            // .addField("Proxy IP", CONFIG.server.getProxyAddress(), false) // TODO: config option
+        ;
         if (CONFIG.discord.mentionRoleOnConnect) {
             sendEmbedMessage(notificationMention(), embed);
         } else {
             sendEmbedMessage(embed);
-        }
+        }*/
         updatePresence();
     }
 

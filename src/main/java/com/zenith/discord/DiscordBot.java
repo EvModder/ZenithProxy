@@ -335,15 +335,23 @@ public class DiscordBot {
     public void updateBotInfo() {
         if (CONFIG.discord.manageNickname)
             DISCORD.setBotNickname(CONFIG.authentication.username + " | ZenithProxy");
-        if (CONFIG.discord.manageDescription)
+        if (CONFIG.discord.manageDescription){
+            var oldDesc = jda.getApplicationManager().getDescription();
+            int s = oldDesc.indexOf("Online:"), e = oldDesc.indexOf("GitHub:");
+            String nameList = "";
+            if(s != -1 && e != -1) nameList = oldDesc.substring(i+7, e).replaceAll("\\s+", "");
+            if(!nameList.contains(CONFIG.authentication.username)){
+                if(!nameList.isEmpty()) nameList += ",";
+                nameList += CONFIG.authentication.username;
+            }
             DISCORD.setBotDescription(
                 """
-                ZenithProxy %s
-                **Official Discord**:
-                  https://discord.gg/nJZrSaRKtb
-                **Github**:
-                  https://github.com/rfresh2/ZenithProxy
-                """.formatted(LAUNCH_CONFIG.version));
+                **Online:**
+                  "%s"
+                **GitHub:**
+                  https://github.com/EvModder/ZenithProxy
+                """.formatted(LAUNCH_CONFIG.version, nameList));
+        }
     }
 
     public void updateBotAvatar() {
