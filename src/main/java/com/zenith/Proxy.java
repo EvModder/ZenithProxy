@@ -175,7 +175,6 @@ public class Proxy {
             if (CONFIG.plugins.enabled) PLUGIN_MANAGER.initialize();
             Queue.start();
             saveConfigAsync();
-            MinecraftConstants.CHUNK_SECTION_COUNT_PROVIDER = CACHE.getSectionCountProvider();
             if (CONFIG.client.viaversion.enabled || CONFIG.server.viaversion.enabled) {
                 VIA_INITIALIZER.init();
             }
@@ -618,6 +617,9 @@ public class Proxy {
                 updateServerIcon(profile);
                 DISCORD.updateBotAvatar();
             });
+        }
+        if (CONFIG.discord.manageNickname) {
+            EXECUTOR.execute(DISCORD::updateBotNickname);
         }
         return minecraftProtocol;
     }

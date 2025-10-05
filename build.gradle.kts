@@ -1,8 +1,8 @@
 plugins {
     `java-library`
-    id("org.graalvm.buildtools.native") version "0.11.0"
-    id("com.gradleup.shadow") version "9.1.0"
-    id("io.freefair.lombok") version "9.0.0-rc2"
+    id("org.graalvm.buildtools.native") version "0.11.1"
+    id("com.gradleup.shadow") version "9.2.2"
+    id("io.freefair.lombok") version "9.0.0"
     `maven-publish`
 }
 
@@ -26,7 +26,7 @@ repositories {
     mavenLocal()
 }
 
-val mcplVersion = "1.21.4.28"
+val mcplVersion = "1.21.4.29"
 dependencies {
     api("com.github.rfresh2:JDA:6.0.19") {
         exclude(group = "club.minnced")
@@ -54,7 +54,7 @@ dependencies {
     api("io.netty:netty-resolver-dns-native-macos") { artifact { classifier = "osx-aarch_64" } }
     api("org.cloudburstmc.math:api:2.0")
     api("org.cloudburstmc.math:immutable:2.0")
-    api("org.redisson:redisson:3.51.0") {
+    api("org.redisson:redisson:3.52.0") {
         exclude(group = "io.netty")
     }
     api("com.github.rfresh2:SimpleEventBus:1.6")
@@ -68,16 +68,16 @@ dependencies {
     api("com.github.rfresh2.fastutil.maps:reference-object-maps:$fastutilVersion")
     api("com.github.rfresh2.fastutil.maps:long-double-maps:$fastutilVersion")
     api("com.github.rfresh2.fastutil.queues:int-queues:$fastutilVersion")
-    api("com.viaversion:vialoader:4.0.4")
-    api("com.viaversion:viaversion:5.4.2")
-    api("com.viaversion:viabackwards:5.4.2")
+    api("com.viaversion:vialoader:4.0.5")
+    api("com.viaversion:viaversion:5.5.0")
+    api("com.viaversion:viabackwards:5.5.0")
     api("org.jline:jline:3.30.6")
     api("org.jline:jline-terminal-jni:3.30.6")
     api("ar.com.hjg:pngj:2.1.0")
     api("com.zaxxer:HikariCP:7.0.2")
-    api("org.postgresql:postgresql:42.7.7")
-    api("org.jdbi:jdbi3-postgres:3.49.5")
-    api("com.google.guava:guava:33.4.6-jre")
+    api("org.postgresql:postgresql:42.7.8")
+    api("org.jdbi:jdbi3-postgres:3.49.6")
+    api("com.google.guava:guava:33.5.0-jre")
     api("ch.qos.logback:logback-classic:1.5.18")
     api("org.slf4j:slf4j-api:2.0.17")
     api("org.slf4j:jul-to-slf4j:2.0.17")
@@ -224,7 +224,7 @@ graalvmNative {
                 "-march=x86-64-v3",
                 "--gc=serial",
                 "-J-XX:MaxRAMPercentage=90",
-				"--enable-sbom=false",
+//				"--enable-sbom=false", todo: detect and disable on graalvm ce
 //                "--enable-monitoring=nmt,jfr",
                 "-J--enable-native-access=ALL-UNNAMED",
                 "-J--sun-misc-unsafe-memory-access=allow",
