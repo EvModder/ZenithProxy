@@ -347,12 +347,6 @@ public class DiscordBot {
                 if(!nameList.isEmpty()) nameList += ",";
                 nameList += CONFIG.authentication.username;
             }
-            // jda.retrieveApplicationInfo().queue(applicationInfo -> {
-            //     String description = applicationInfo.getDescription();
-            //     System.out.println("Bot Description: " + description);
-            // }, throwable -> {
-            //     System.err.println("Error retrieving application info: " + throwable.getMessage());
-            // });
             DISCORD.setBotDescription(
                 """
                 **Online:**
