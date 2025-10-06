@@ -342,7 +342,12 @@ public class DiscordBot {
             String oldDesc = jda.retrieveApplicationInfo().complete().getDescription();
             int s = oldDesc.indexOf("Online:"), e = oldDesc.indexOf("GitHub:");
             String nameList = "";
-            if(s != -1 && e != -1) nameList = oldDesc.substring(s+7, e).replaceAll("\\s+", "");
+            if(s != -1 && e != -1){
+                // 1 in 10 chance of clearing nameList (proportional to # of bots)
+                if(Math.abs(ThreadLocalRandom.current().nextInt()%(10*nameList.split(",").length)) != 0){
+                    nameList = oldDesc.substring(s+7, e).replaceAll("\\s+", "");
+                }
+            }
             if(!nameList.contains(CONFIG.authentication.username)){
                 if(!nameList.isEmpty()) nameList += ",";
                 nameList += CONFIG.authentication.username;
