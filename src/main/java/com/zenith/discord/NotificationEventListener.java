@@ -172,6 +172,7 @@ public class NotificationEventListener {
     }
 
     public void handleDisconnectEvent(ClientDisconnectEvent event) {
+        if(event.wasInQueue() && event.onlineDurationWithQueueSkip().toMinutes() < 3) return; //TODO: config option
         var category = DisconnectReasonInfo.getDisconnectCategory(event.reason());
         var embed = Embed.builder()
             .title(CONFIG.authentication.username+" disconnected")
