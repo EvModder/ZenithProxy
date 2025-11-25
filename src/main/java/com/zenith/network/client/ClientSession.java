@@ -6,10 +6,10 @@ import com.zenith.event.client.ClientConnectEvent;
 import com.zenith.event.client.ClientDisconnectEvent;
 import com.zenith.mc.biome.BiomeRegistry;
 import com.zenith.mc.block.BlockRegistry;
+import com.zenith.network.ClientKeepAliveTask;
 import com.zenith.network.ClientPacketPingTask;
 import com.zenith.network.codec.PacketCodecRegistries;
 import com.zenith.util.ComponentSerializer;
-import com.zenith.util.config.Config;
 import io.netty.channel.DefaultEventLoop;
 import io.netty.channel.EventLoop;
 import io.netty.util.concurrent.DefaultThreadFactory;
@@ -49,7 +49,11 @@ public class ClientSession extends TcpClientSession {
     private int lastQueuePosition = Integer.MAX_VALUE;
     // in game
     private boolean online = false;
+    private boolean wasOnline = false;
+    // if we are still attempting to connect or this session has disconnected
     private boolean disconnected = true;
+    // if we have been disconnected and this session cannot be reused
+    private boolean terminalState = false;
     // profile we logged in with
     // MC servers can send a different profile back, which will be stored in `CACHE.getProfileCache()`
     private final GameProfile profile;
@@ -70,12 +74,16 @@ public class ClientSession extends TcpClientSession {
 
     public void setOnline(final boolean online) {
         this.online = online;
-        if (online) clientTickManager.startClientTicks();
+        if (online) {
+            clientTickManager.startClientTicks();
+            wasOnline = true;
+        }
         else clientTickManager.stopClientTicks();
     }
 
     public void setDisconnected(final boolean disconnected) {
         this.disconnected = disconnected;
+        if (disconnected) setTerminalState(true);
         setOnline(false);
     }
 
@@ -166,7 +174,8 @@ public class ClientSession extends TcpClientSession {
         updateClientProtocolVersion();
         EVENT_BUS.postAsync(new ClientConnectEvent());
         send(new ServerboundHelloPacket(profile.getName(), profile.getId()));
-        if (CONFIG.client.ping.mode == Config.Client.Ping.Mode.PACKET) EXECUTOR.execute(new ClientPacketPingTask(this));
+        clientEventLoop.scheduleAtFixedRate(new ClientPacketPingTask(this), 0, CONFIG.client.ping.pingIntervalSeconds, TimeUnit.SECONDS);
+        clientEventLoop.scheduleAtFixedRate(new ClientKeepAliveTask(this), 0, 50, TimeUnit.MILLISECONDS);
     }
 
     private void updateClientProtocolVersion() {
@@ -212,8 +221,13 @@ public class ClientSession extends TcpClientSession {
         CLIENT_LOG.info("Disconnected: {}", reason != null ? reason : reasonStr);
         var onlineDuration = Duration.ofSeconds(Proxy.getInstance().getOnlineTimeSeconds());
         var onlineDurationWithQueueSkip = Duration.ofSeconds(Proxy.getInstance().getOnlineTimeSecondsWithQueueSkip());
-        // stop processing packets before we reset the client cache to avoid race conditions
-        getClientEventLoop().shutdownGracefully(0L, 15L, TimeUnit.SECONDS).awaitUninterruptibly();
+        try {
+            CLIENT_LOG.trace("Shutting down client event loop...");
+            // stop processing packets before we reset the client cache to avoid race conditions
+            getClientEventLoop().shutdownGracefully(0L, 15L, TimeUnit.SECONDS).awaitUninterruptibly(20L, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            CLIENT_LOG.error("Error awaiting client event loop shutdown", e);
+        }
         EVENT_BUS.post(new ClientDisconnectEvent(reasonStr, onlineDuration, onlineDurationWithQueueSkip, Proxy.getInstance().isInQueue(), Proxy.getInstance().getQueuePosition()));
     }
 

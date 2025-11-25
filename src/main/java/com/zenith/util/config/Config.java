@@ -3,6 +3,7 @@ package com.zenith.util.config;
 import com.google.common.collect.Lists;
 import com.google.gson.annotations.SerializedName;
 import com.zenith.feature.chatschema.ChatSchema;
+import com.zenith.feature.tasks.Task;
 import com.zenith.feature.waypoints.Waypoint;
 import com.zenith.feature.whitelist.PlayerEntry;
 import com.zenith.module.impl.ActiveHours.ActiveTime;
@@ -11,6 +12,7 @@ import lombok.Getter;
 import org.geysermc.mcprotocollib.network.ProxyInfo;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -40,7 +42,6 @@ public final class Config {
         // updated on successful login
         public String username = "Unknown";
         public boolean prio = false;
-        public boolean prioBanned = false;
         public boolean authTokenRefresh = true;
         public int msaLoginAttemptsBeforeCacheWipe = 2;
         public boolean openBrowserOnLogin = true;
@@ -73,7 +74,6 @@ public final class Config {
         public String bindAddress = "0.0.0.0";
         public boolean maxPlaytimeReconnect = false;
         public long maxPlaytimeReconnectMins = 1440;
-        public boolean automaticKeepAliveManagement = true;
         public int defaultClientRenderDistance = 25;
         public final ClientTimeout timeout = new ClientTimeout();
         public final Ping ping = new Ping();
@@ -81,6 +81,16 @@ public final class Config {
         public final Extra extra = new Extra();
         public final Inventory inventory = new Inventory();
         public final ChatSchemas chatSchemas = new ChatSchemas();
+        public final KeepAliveHandling keepAliveHandling = new KeepAliveHandling();
+
+        public static final class KeepAliveHandling {
+            public KeepAliveMode keepAliveMode = KeepAliveMode.PASSTHROUGH;
+            public int keepAliveQueueTimeoutMs = 2000;
+            public enum KeepAliveMode {
+                PASSTHROUGH,
+                INDEPENDENT
+            }
+        }
 
         public static final class ChatSchemas {
             public LinkedHashMap<String, ChatSchema> serverSchemas = new LinkedHashMap<>();
@@ -96,7 +106,7 @@ public final class Config {
         public static final class ChatSigning {
             public boolean enabled = true;
             public boolean force = false;
-            public boolean signWhispers = true;
+            public boolean signCommands = true;
         }
 
         public static final class ClientViaVersion {
@@ -112,12 +122,7 @@ public final class Config {
         }
 
         public static final class Ping {
-            public Mode mode = Mode.TABLIST;
-            public int packetPingIntervalSeconds = 10;
-
-            public enum Mode {
-                TABLIST, PACKET
-            }
+            public int pingIntervalSeconds = 5;
         }
 
         public static final class Extra {
@@ -143,6 +148,7 @@ public final class Config {
             public boolean killMessage = true;
             public boolean logChatMessages = true;
             public boolean logOnlyQueuePositionUpdates = true;
+            public boolean reconfiguringNotification = true;
             public final CoordObfuscation coordObfuscation = new CoordObfuscation();
             public final ActionLimiter actionLimiter = new ActionLimiter();
             public final VisualRange visualRange = new VisualRange();
@@ -159,6 +165,14 @@ public final class Config {
             public final AutoDrop autoDrop = new AutoDrop();
             public String whisperCommand = "msg";
             public int tpsBufferSize = 20;
+            public final Tasks tasks = new Tasks();
+
+            public static final class Tasks {
+                public boolean enabled = true;
+                public final LinkedHashMap<String, Task> tasks = new LinkedHashMap<>();
+                public boolean logCommandActionOutput = true;
+                public boolean taskCommandExecutedNotification = true;
+            }
 
             public static final class Waypoints {
                 public ArrayList<Waypoint> waypoints = new ArrayList<>();
@@ -176,6 +190,7 @@ public final class Config {
             }
 
             public static final class Pathfinder {
+                public @Nullable Integer priority = null;
                 public boolean allowBreak = true;
                 public boolean allowSprint = false;
                 public boolean allowPlace = true;
@@ -207,6 +222,7 @@ public final class Config {
                 public boolean getToBlockBlacklistClosestOnFailure = false;
                 public boolean simplifyUnloadedYGoal = false;
                 public boolean placeBlockVerifyAbleToPlace = true;
+                public int interactWithProcessMaxPathTries = 5;
             }
 
             public static class SessionTimeLimit {
@@ -218,6 +234,7 @@ public final class Config {
             }
 
             public static class Click {
+                public @Nullable Integer priority = null;
                 public boolean enabled = true;
                 public boolean holdLeftClick = false;
                 public boolean holdRightClick = false;
@@ -245,6 +262,7 @@ public final class Config {
             }
 
             public static class SpawnPatrol {
+                public @Nullable Integer priority = null;
                 public boolean enabled = false;
                 public boolean ignoreFriends = true;
                 public boolean targetOnlyNakeds = true;
@@ -269,6 +287,7 @@ public final class Config {
             }
 
             public static class AutoMend {
+                public @Nullable Integer priority = null;
                 public boolean enabled = false;
             }
 
@@ -293,6 +312,7 @@ public final class Config {
             }
 
             public static class AutoArmor {
+                public @Nullable Integer priority = null;
                 public boolean enabled = false;
             }
 
@@ -314,6 +334,7 @@ public final class Config {
             }
 
             public static final class AutoTotem {
+                public @Nullable Integer priority = null;
                 public boolean enabled = true;
                 public boolean inGame = false;
                 public int healthThreshold = 20;
@@ -332,6 +353,7 @@ public final class Config {
             }
 
             public static final class KillAura {
+                public @Nullable Integer actionPriority = null;
                 public boolean enabled = false;
                 public boolean targetPlayers = false;
                 public boolean targetHostileMobs = true;
@@ -340,19 +362,37 @@ public final class Config {
                 public boolean onlyNeutralAggressive = false;
                 public boolean onlyHostileAggressive = false;
                 public boolean switchWeapon = true;
-                public boolean targetArmorStands = false;
+                public boolean targetArmorStands = false; // soft deprecated
                 public int attackDelayTicks = 10;
+                // When enabled, adjusts attackDelayTicks by current server TPS
+                // so attack rate stays consistent.
+                public boolean tpsSync = false;
                 public boolean raycast = false;
                 public final ArrayList<EntityType> customTargets = new ArrayList<>();
                 public Priority priority = Priority.NONE;
+                public WeaponType weaponType = WeaponType.ANY;
+                public WeaponMaterial weaponMaterial = WeaponMaterial.ANY;
 
                 public enum Priority {
                     NONE,
                     NEAREST
                 }
+
+                public enum WeaponType {
+                    ANY,
+                    SWORD,
+                    AXE
+                }
+
+                public enum WeaponMaterial {
+                    ANY,
+                    NETHERITE,
+                    DIAMOND
+                }
             }
 
             public static final class AutoEat {
+                public @Nullable Integer priority = null;
                 public boolean enabled = true;
                 public int healthThreshold = 10;
                 public int hungerThreshold = 10;
@@ -362,6 +402,7 @@ public final class Config {
             }
 
             public static final class AutoOmen {
+                public @Nullable Integer priority = null;
                 public boolean enabled = false;
                 public boolean whileRaidActive = false;
                 public boolean whileOmenActive = false;
@@ -375,12 +416,14 @@ public final class Config {
             }
 
             public static final class AutoFish {
+                public @Nullable Integer priority = null;
                 public boolean enabled = false;
                 public float yaw = 0.0f;
                 public float pitch = 0.0f;
             }
 
             public static final class AntiAFK {
+                public @Nullable Integer priority = null;
                 public Actions actions = new Actions();
                 public boolean enabled = true;
 
@@ -405,6 +448,7 @@ public final class Config {
             }
 
             public static final class Spook {
+                public @Nullable Integer priority = null;
                 public boolean enabled = false;
                 public TargetingMode spookTargetingMode = TargetingMode.VISUAL_RANGE;
 
@@ -576,6 +620,7 @@ public final class Config {
             public String password = "";
         }
         public static final class AutoDrop {
+            public @Nullable Integer priority = null;
             public boolean enabled = false;
             public Mode mode = Mode.WHITELIST;
             public enum Mode {
@@ -601,6 +646,10 @@ public final class Config {
         public boolean terminalDebugLogs = false;
         public boolean inventorySyncOnLogin = false;
         public boolean lockFile = true;
+        public boolean passthroughResourcePacks = true;
+        public boolean inputManagerDebugLogs = false;
+        public boolean botPitchPrecisionClamping = true;
+        public boolean botRotateBeforeInteract = true;
 
         public static final class PacketLog {
             public boolean enabled = false;
@@ -624,9 +673,10 @@ public final class Config {
             public final Cache cache = new Cache();
 
             public static final class Cache {
-                public boolean unlockAllRecipes = true;
                 public boolean fullbrightChunkSkylight = true;
                 public boolean fullbrightChunkBlocklight = false;
+                // each map is 16kb, so 128 maps = ~2MB
+                public int maxCachedMaps = 128;
             }
         }
     }
@@ -657,6 +707,17 @@ public final class Config {
         public boolean injectTablistFooter = true;
         public boolean welcomeMessages = true;
         public boolean updateServerIcon = true;
+        public final ChatSigning chatSigning = new ChatSigning();
+
+        public static final class ChatSigning {
+            public ChatSigningMode mode = ChatSigningMode.DISGUISED;
+
+            public enum ChatSigningMode {
+                PASSTHROUGH,
+                DISGUISED,
+                SYSTEM
+            }
+        }
 
         public static final class PacketRateLimiter {
             public boolean enabled = true;
@@ -812,7 +873,6 @@ public final class Config {
         public boolean mentionOnNonWhitelistedClientConnected = false;
         public boolean mentionOnSpectatorDisconnected = false;
         public boolean mentionRoleOnPrioUpdate = true;
-        public boolean mentionRoleOnPrioBanUpdate = true;
         public boolean mentionRoleOnDeviceCodeAuth = true;
         public boolean manageProfileImage = true;
         public boolean manageNickname = true;
@@ -835,6 +895,7 @@ public final class Config {
             public boolean deathMessages = true;
             public boolean sendMessages = true;
             public String channelId = "";
+            public ArrayList<String> ignoreRegex = new ArrayList<>();
         }
     }
 

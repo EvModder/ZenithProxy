@@ -55,6 +55,7 @@ public class NotificationEventListener {
             this,
             of(ClientConnectEvent.class, this::handleConnectEvent),
             of(ClientOnlineEvent.class, this::handlePlayerOnlineEvent),
+            of(ClientConfigurationEvent.Entering.class, this::handleClientConfigurationEnteringEvent),
             of(ClientDisconnectEvent.class, this::handleDisconnectEvent),
             of(QueuePositionUpdateEvent.class, this::handleQueuePositionUpdateEvent),
             of(QueueWarningEvent.class, this::handleQueueWarning),
@@ -83,7 +84,6 @@ public class NotificationEventListener {
             of(ClientLoginFailedEvent.class, this::handleProxyLoginFailedEvent),
             // of(ClientStartConnectEvent.class, this::handleStartConnectEvent),
             of(PrioStatusUpdateEvent.class, this::handlePrioStatusUpdateEvent),
-            of(PrioBanStatusUpdateEvent.class, this::handlePrioBanStatusUpdateEvent),
             // of(AutoReconnectEvent.class, this::handleAutoReconnectEvent),
             of(MsaDeviceCodeLoginEvent.class, this::handleMsaDeviceCodeLoginEvent),
             of(UpdateAvailableEvent.class, this::handleUpdateAvailableEvent),
@@ -95,8 +95,17 @@ public class NotificationEventListener {
             of(PluginLoadedEvent.class, this::handlePluginLoadedEvent),
             of(SpawnPatrolTargetAcquiredEvent.class, this::handleSpawnPatrolTargetAcquiredEvent),
             of(SpawnPatrolTargetKilledEvent.class, this::handleSpawnPatrolTargetKilledEvent),
-            of(SessionTimeLimitWarningEvent.class, this::handleSessionTimeLimitEvent)
+            of(SessionTimeLimitWarningEvent.class, this::handleSessionTimeLimitEvent),
+            of(TasksCommandExecutedEvent.class, this::handleScheduledTaskCommandExecutedEvent)
         );
+    }
+
+    private void handleScheduledTaskCommandExecutedEvent(TasksCommandExecutedEvent event) {
+        if (!CONFIG.client.extra.tasks.taskCommandExecutedNotification) return;
+        sendEmbedMessage(Embed.builder()
+            .title("Scheduled Task Executed")
+            .addField("Command", "`" + event.command() + "`")
+            .primaryColor());
     }
 
     public static String notificationMention() {
@@ -171,6 +180,14 @@ public class NotificationEventListener {
         }
     }
 
+    private void handleClientConfigurationEnteringEvent(ClientConfigurationEvent.Entering event) {
+        if (!CONFIG.client.extra.reconfiguringNotification) return;
+        var embedBuilder = Embed.builder()
+            .title("Reconfiguring...")
+            .inQueueColor();
+        sendEmbedMessage(embedBuilder);
+    }
+
     public void handleDisconnectEvent(ClientDisconnectEvent event) {
         if(event.onlineDurationWithQueueSkip().toMinutes() < 3) return; //TODO: config option
         var category = DisconnectReasonInfo.getDisconnectCategory(event.reason());
@@ -181,40 +198,47 @@ public class NotificationEventListener {
             // .addField("Category", category.toString(), false) //TODO: config option
             .addField("Online Duration", formatDuration(event.onlineDurationWithQueueSkip()), false)
             .errorColor();
-        if (Proxy.getInstance().isOn2b2t()
-            && !Proxy.getInstance().isPrio()
-            && category == DisconnectReasonInfo.DisconnectCategory.KICK) {
-            if (event.onlineDuration().toSeconds() >= 0L
-                && event.onlineDuration().toSeconds() <= 1L) {
-                embed.description("""
+        if (Proxy.getInstance().isOn2b2t()) {
+            switch (category) {
+                case KICK -> {
+                    if (!Proxy.getInstance().isPrio()) {
+                        if (event.onlineDuration().toSeconds() >= 0L && event.onlineDuration().toSeconds() <= 1L) {
+                            embed.description("""
                       You have likely been kicked for reaching the 2b2t non-prio account IP limit.
                       Consider configuring a connection proxy with the `clientConnection` command.
                       Or migrate ZenithProxy instances to multiple hosts/IP's.
                       """);
-            } else if (event.wasInQueue() && event.queuePosition() <= 1) {
-                embed.description("""
+                        } else if (event.wasInQueue() && event.queuePosition() <= 1) {
+                            embed.description("""
                       You have likely been kicked due to being IP banned by 2b2t.
                       To check, try connecting and waiting through queue with the same account from a different IP.
                       """);
-            } else if (!event.wasInQueue()
-                && MathHelper.isInRange( // whether we were kicked at session time limit +- 30s
-                    event.onlineDuration().toSeconds(),
-                    MODULE.get(SessionTimeLimit.class).getSessionTimeLimit().toSeconds(),
-                    30L)) {
-                embed.description("""
+                        } else if (!event.wasInQueue()
+                            && MathHelper.isInRange( // whether we were kicked at session time limit +- 30s
+                            event.onlineDuration().toSeconds(),
+                            MODULE.get(SessionTimeLimit.class).getSessionTimeLimit().toSeconds(), 30L)
+                        ) {
+                            embed.description("""
                         You have likely been kicked for reaching the non-prio session time limit.
                         2b2t kicks non-prio players after %s hours online.
                         """.formatted(MODULE.get(SessionTimeLimit.class).getSessionTimeLimit().toHours()));
-            } else if (!event.wasInQueue()
-                && MathHelper.isInRange( // whether we were kicked at 20 minutes +- 30s
-                     event.onlineDuration().toSeconds(),
-                     TimeUnit.MINUTES.toSeconds(20),
-                     30L)) {
-                String msg = "You have possibly been kicked by 2b2t's AntiAFK plugin";
-                if (!MODULE.get(AntiAFK.class).isEnabled()) {
-                    msg += "\n\nConsider enabling ZenithProxy's AntiAFK module: `antiAFK on`";
+                        } else if (!event.wasInQueue()
+                            && MathHelper.isInRange( // whether we were kicked at 20 minutes +- 30s
+                            event.onlineDuration().toSeconds(),
+                            TimeUnit.MINUTES.toSeconds(20),
+                            30L)
+                        ) {
+                            String msg = "You have possibly been kicked by 2b2t's AntiAFK plugin";
+                            if (!MODULE.get(AntiAFK.class).isEnabled()) {
+                                msg += "\n\nConsider enabling ZenithProxy's AntiAFK module: `antiAFK on`";
+                            }
+                            embed.description(msg);
+                        }
+                    }
                 }
-                embed.description(msg);
+                case CONNECTION_ISSUE, CONNECTION_ISSUE_PLAYER, CONNECTION_ISSUE_2B2T -> {
+                    embed.addField("2b2t Status", "https://status.2b2t.org/");
+                }
             }
         }
         if (CONFIG.discord.mentionRoleOnDisconnect) {
@@ -288,9 +312,9 @@ public class NotificationEventListener {
 
     public void handleSelfDeathMessageEvent(ClientDeathMessageEvent event) {
         sendEmbedMessage(Embed.builder()
-                             .title("Death Message")
-                             .errorColor()
-                             .addField("Message", event.message(), false));
+            .title("Death Message")
+            .errorColor()
+            .addField("Message", event.message(), false));
     }
 
     public void handleHealthAutoDisconnectEvent(HealthAutoDisconnectEvent event) {
@@ -337,11 +361,11 @@ public class NotificationEventListener {
             var desc = """
                  **Client MC Version**: %s
                  **ZenithProxy Client MC Version**: %s
-                 
+
                  It is recommended to use the same MC version as the ZenithProxy client.
-                 
+
                  Otherwise you may experience issues with 2b2t's anti-cheat, which changes its checks based on client MC version.
-                 
+
                  Or configure ZenithProxy's client ViaVersion (reconnect after changing):
                  `via zenithToServer version %s`
                  """.formatted(playerProtocolVersion.getName(), clientProtocolVersion.getName(), playerProtocolVersion.getName());
@@ -355,7 +379,24 @@ public class NotificationEventListener {
                 .title("MC Version Mismatch")
                 .description(desc)
                 .errorColor();
-            sendEmbedMessage(embed);
+            var buttonId = "via-" + ThreadLocalRandom.current().nextInt(1000000);
+            var button = Button.primary(buttonId, "Auto-Configure ViaVersion");
+            Consumer<ButtonInteractionEvent> mapper = e -> {
+                if (e.getComponentId().equals(buttonId)) {
+                    CONFIG.client.viaversion.protocolVersion = playerProtocolVersion.getVersion();
+                    CONFIG.client.viaversion.disableOn2b2t = false;
+                    CONFIG.client.viaversion.enabled = true;
+                    saveConfigAsync();
+                    e.replyEmbeds(Embed.builder()
+                            .title("ViaVersion Configured")
+                            .description("Changes will take effect on next connect")
+                            .addField("MC Version", playerProtocolVersion.getName())
+                            .primaryColor()
+                            .toJDAEmbed())
+                        .complete();
+                }
+            };
+            sendEmbedMessageWithButtons(embed, List.of(button), mapper, Duration.ofHours(1L));
         }
     }
 
@@ -421,19 +462,19 @@ public class NotificationEventListener {
         final Consumer<ButtonInteractionEvent> mapper = e -> {
             if (e.getComponentId().equals(buttonId)) {
                 DISCORD_LOG.info("{} added friend: {} [{}]",
-                                 Optional.ofNullable(e.getInteraction().getMember())
-                                     .map(m -> m.getUser().getName())
-                                     .orElse("Unknown"),
-                                 event.playerEntry().getName(),
-                                 event.playerEntry().getProfileId());
+                    Optional.ofNullable(e.getInteraction().getMember())
+                        .map(m -> m.getUser().getName())
+                        .orElse("Unknown"),
+                    event.playerEntry().getName(),
+                    event.playerEntry().getProfileId());
                 PLAYER_LISTS.getFriendsList().add(event.playerEntry().getName());
                 e.replyEmbeds(Embed.builder()
-                                         .title("Friend Added")
-                                         .successColor()
-                                         .addField("Player Name", escape(event.playerEntry().getName()), true)
-                                         .addField("Player UUID", ("[" + event.playerEntry().getProfileId() + "](https://namemc.com/profile/" + event.playerEntry().getProfileId() + ")"), true)
-                                         .thumbnail(Proxy.getInstance().getPlayerBodyURL(event.playerEntry().getProfileId()).toString())
-                                         .toJDAEmbed())
+                        .title("Friend Added")
+                        .successColor()
+                        .addField("Player Name", escape(event.playerEntry().getName()), true)
+                        .addField("Player UUID", ("[" + event.playerEntry().getProfileId() + "](https://namemc.com/profile/" + event.playerEntry().getProfileId() + ")"), true)
+                        .thumbnail(Proxy.getInstance().getPlayerBodyURL(event.playerEntry().getProfileId()).toString())
+                        .toJDAEmbed())
                     .complete();
                 saveConfigAsync();
             }
@@ -506,30 +547,30 @@ public class NotificationEventListener {
                 if (e.getComponentId().equals(buttonId)) {
                     if (validateButtonInteractionEventFromAccountOwner(e)) {
                         DISCORD_LOG.info("{} whitelisted {} [{}]",
-                                         Optional.ofNullable(e.getInteraction().getMember()).map(m -> m.getUser().getName()).orElse("Unknown"),
-                                         event.gameProfile().getName(),
-                                         event.gameProfile().getId().toString());
+                            Optional.ofNullable(e.getInteraction().getMember()).map(m -> m.getUser().getName()).orElse("Unknown"),
+                            event.gameProfile().getName(),
+                            event.gameProfile().getId().toString());
                         PLAYER_LISTS.getWhitelist().add(event.gameProfile().getName());
                         e.replyEmbeds(Embed.builder()
-                                                 .title("Player Whitelisted")
-                                                 .successColor()
-                                                 .addField("Player Name", escape(event.gameProfile().getName()), true)
-                                                 .addField("Player UUID", ("[" + event.gameProfile().getId().toString() + "](https://namemc.com/profile/" + event.gameProfile().getId().toString() + ")"), true)
-                                                 .thumbnail(Proxy.getInstance().getPlayerBodyURL(event.gameProfile().getId()).toString())
-                                                 .toJDAEmbed()).complete();
+                            .title("Player Whitelisted")
+                            .successColor()
+                            .addField("Player Name", escape(event.gameProfile().getName()), true)
+                            .addField("Player UUID", ("[" + event.gameProfile().getId().toString() + "](https://namemc.com/profile/" + event.gameProfile().getId().toString() + ")"), true)
+                            .thumbnail(Proxy.getInstance().getPlayerBodyURL(event.gameProfile().getId()).toString())
+                            .toJDAEmbed()).complete();
                         saveConfigAsync();
                     } else {
                         DISCORD_LOG.error("{} attempted to whitelist {} [{}] but was not authorized to do so!",
-                                          Optional.ofNullable(e.getInteraction().getMember()).map(m -> m.getUser().getName()).orElse("Unknown"),
-                                          event.gameProfile().getName(),
-                                          event.gameProfile().getId().toString());
+                            Optional.ofNullable(e.getInteraction().getMember()).map(m -> m.getUser().getName()).orElse("Unknown"),
+                            event.gameProfile().getName(),
+                            event.gameProfile().getId().toString());
                         e.replyEmbeds(Embed.builder()
-                                                 .title("Not Authorized!")
-                                                 .errorColor()
-                                                 .addField("Error",
-                                                           "User: " + Optional.ofNullable(e.getInteraction().getMember()).map(m -> m.getUser().getName()).orElse("Unknown")
-                                                               + " is not authorized to execute this command! Contact the account owner", true)
-                                                 .toJDAEmbed()).complete();
+                            .title("Not Authorized!")
+                            .errorColor()
+                            .addField("Error",
+                                "User: " + Optional.ofNullable(e.getInteraction().getMember()).map(m -> m.getUser().getName()).orElse("Unknown")
+                                    + " is not authorized to execute this command! Contact the account owner", true)
+                            .toJDAEmbed()).complete();
                     }
                 }
             };
@@ -603,11 +644,11 @@ public class NotificationEventListener {
         event.deathMessage().killer().ifPresent(killer -> {
             if (!killer.name().equals(CONFIG.authentication.username)) return;
             sendEmbedMessage(Embed.builder()
-                                 .title("Kill Detected")
-                                 .primaryColor()
-                                 .addField("Victim", escape(event.deathMessage().victim()), false)
-                                 .addField("Message", escape(event.message()), false)
-                                 .thumbnail(Proxy.getInstance().getPlayerHeadURL(event.deathMessage().victim()).toString()));
+                .title("Kill Detected")
+                .primaryColor()
+                .addField("Victim", escape(event.deathMessage().victim()), false)
+                .addField("Message", escape(event.message()), false)
+                .thumbnail(Proxy.getInstance().getPlayerHeadURL(event.deathMessage().victim()).toString()));
         });
     }
 
@@ -658,12 +699,12 @@ public class NotificationEventListener {
     }
 
     public void handleProxyLoginFailedEvent(ClientLoginFailedEvent event) {
-        var description = """ 
+        var description = """
         [Help]
         Try waiting and connecting again.
-        
+
         If that fails, log into the account with the vanilla MC launcher and join a server. Then try again with ZenithProxy.
-        
+
         Another possible cause is your microsoft account needing to have a password (re)set. Usually only possible if you are using email codes to log in instead of passwords.
         """;
         if (event.exception() != null) {
@@ -682,8 +723,8 @@ public class NotificationEventListener {
 
     public void handleStartConnectEvent(ClientStartConnectEvent event) {
         sendEmbedMessage(Embed.builder()
-                             .title("Connecting...")
-                             .inQueueColor());
+            .title("Connecting...")
+            .inQueueColor());
     }
 
     public void handlePrioStatusUpdateEvent(PrioStatusUpdateEvent event) {
@@ -706,29 +747,10 @@ public class NotificationEventListener {
         }
     }
 
-    public void handlePrioBanStatusUpdateEvent(PrioBanStatusUpdateEvent event) {
-        var embed = Embed.builder();
-        if (event.prioBanned()) {
-            embed
-                .title("Prio Ban Detected")
-                .errorColor();
-        } else {
-            embed
-                .title("Prio Unban Detected")
-                .successColor();
-        }
-        embed.addField("User", escape(CONFIG.authentication.username), false);
-        if (CONFIG.discord.mentionRoleOnPrioBanUpdate) {
-            sendEmbedMessage(notificationMention(), embed);
-        } else {
-            sendEmbedMessage(embed);
-        }
-    }
-
     public void handleAutoReconnectEvent(final AutoReconnectEvent event) {
         sendEmbedMessage(Embed.builder()
-                             .title("AutoReconnecting in " + event.delaySeconds() + "s")
-                             .inQueueColor());
+            .title("AutoReconnecting in " + event.delaySeconds() + "s")
+            .inQueueColor());
     }
 
     public void handleMsaDeviceCodeLoginEvent(final MsaDeviceCodeLoginEvent event) {
@@ -758,8 +780,8 @@ public class NotificationEventListener {
 
     public void handleReplayStartedEvent(final ReplayStartedEvent event) {
         sendEmbedMessage(Embed.builder()
-                             .title("Replay Recording Started")
-                             .primaryColor());
+            .title("Replay Recording Started")
+            .primaryColor());
     }
 
     public void handleReplayStoppedEvent(final ReplayStoppedEvent event) {

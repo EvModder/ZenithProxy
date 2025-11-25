@@ -35,6 +35,7 @@ public class TPSCalculator {
     private void onTick(ClientTickEvent event) {
         if (!Proxy.getInstance().isOnlineForAtLeastDuration(Duration.ofSeconds(1))) return;
         var worldTimeData = CACHE.getChunkCache().getWorldTimeData();
+        if (worldTimeData == null) return;
         long lastUpdate = worldTimeData.getLastUpdate();
         if (prevWorldTimeUpdate == -1) {
             prevWorldTimeUpdate = lastUpdate;
@@ -65,5 +66,13 @@ public class TPSCalculator {
 
     public String getTPS() {
         return String.format("%.2f", getTickRateAverage());
+    }
+
+    /**
+     * Returns the current average server TPS as a double value in the range [0.0, 20.0].
+     * Falls back to 20.0 when insufficient data has been collected yet.
+     */
+    public double getTPSValue() {
+        return getTickRateAverage();
     }
 }

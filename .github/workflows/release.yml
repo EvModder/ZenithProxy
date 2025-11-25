@@ -12,7 +12,7 @@ jobs:
       image: catthehacker/ubuntu:act-22.04
     steps:
       - name: Check out repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           persist-credentials: false
 
@@ -40,9 +40,10 @@ jobs:
           echo "RELEASE_TAG=$TAG_NAME" >> "$GITHUB_ENV"
 
       - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
         with:
           dependency-graph: generate-and-submit
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
 
       - name: Build ZenithProxy Java
         run: ./gradlew build

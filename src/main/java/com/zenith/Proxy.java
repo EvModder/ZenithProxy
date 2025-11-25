@@ -36,7 +36,7 @@ import dev.omega24.upnp4j.util.Protocol;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
-import net.raphimc.minecraftauth.responsehandler.exception.MinecraftRequestException;
+import net.raphimc.minecraftauth.bedrock.exception.MinecraftRequestException;
 import org.geysermc.mcprotocollib.auth.GameProfile;
 import org.geysermc.mcprotocollib.network.BuiltinFlags;
 import org.geysermc.mcprotocollib.network.ProxyInfo;
@@ -98,6 +98,7 @@ public class Proxy {
     private LanBroadcaster lanBroadcaster;
     private TcpConnectionManager tcpManager;
     private FileLock fileLock;
+    private final long startTime = System.currentTimeMillis();
 
     public static void main(String... args) {
         Locale.setDefault(Locale.ENGLISH);
@@ -222,7 +223,7 @@ public class Proxy {
                             """));
             }
             if (!connected) {
-                DEFAULT_LOG.info("Commands Help: https://github.com/rfresh2/ZenithProxy/wiki/Commands");
+                DEFAULT_LOG.info("Commands Help: https://wiki.2b2t.vc/Commands");
                 DEFAULT_LOG.info("Proxy IP: {}", CONFIG.server.getProxyAddress());
                 DEFAULT_LOG.info("Use the `connect` command to log in!");
             }
@@ -440,7 +441,7 @@ public class Proxy {
 
     public synchronized void connect(final String address, final int port) {
         if (this.isConnected()) throw new IllegalStateException("Already connected!");
-        if (this.client != null && !this.client.isDisconnected()) throw new IllegalStateException("Not Disconnected!");
+        if (this.client != null && !this.client.isTerminalState()) throw new IllegalStateException("Not Disconnected!");
         this.connectTime = Instant.now();
         final MinecraftProtocol minecraftProtocol;
         try {
@@ -464,7 +465,7 @@ public class Proxy {
         this.client.setFlag(MinecraftConstants.CLIENT_CHANNEL_INITIALIZER, ZenithClientChannelInitializer.FACTORY);
         this.client.connect(true);
         // wait for connection state to stabilize
-        Wait.waitUntil(() -> this.client.isConnected() || this.client.isDisconnected(), 30);
+        Wait.waitUntil(() -> this.client.isConnected() || this.client.isTerminalState(), 30);
     }
 
     @Nullable
@@ -761,8 +762,8 @@ public class Proxy {
             byte[] icon = SkinRetriever.getRenderedAvatar(profile)
                 .orElse(serverIcon);
             var event = new ServerIconBuildEvent(icon);
-            EVENT_BUS.post(event.getIcon());
-            this.serverIcon = icon;
+            EVENT_BUS.post(event);
+            this.serverIcon = event.getIcon();
             writeServerIconFile();
         } catch (final Throwable e) {
             SERVER_LOG.error("Failed updating server icon");
@@ -782,9 +783,11 @@ public class Proxy {
     }
 
     public long getOnlineTimeSecondsWithQueueSkip() {
-        return !inQueue && didQueueSkip && prevOnlineSeconds.isPresent()
-            ? getOnlineTimeSeconds() + prevOnlineSeconds.getAsLong()
-            : getOnlineTimeSeconds();
+        long beforeQueueSkipOnlineTime = 0L;
+        if (!inQueue && didQueueSkip) {
+            beforeQueueSkipOnlineTime = prevOnlineSeconds.orElse(0L);
+        }
+        return getOnlineTimeSeconds() + beforeQueueSkipOnlineTime;
     }
 
     public String getOnlineTimeString() {

@@ -8,7 +8,6 @@ import com.zenith.event.queue.QueueStartEvent;
 import com.zenith.network.client.ClientSession;
 import com.zenith.network.codec.ClientEventLoopPacketHandler;
 import com.zenith.util.ComponentSerializer;
-import com.zenith.util.config.Config;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundTabListPacket;
 import org.jspecify.annotations.NonNull;
 
@@ -34,7 +33,7 @@ public class TabListDataHandler implements ClientEventLoopPacketHandler<Clientbo
             if (session.isInQueue()) {
                 parse2bPrioQueueState(packet);
             } else if (session.isOnline()) {
-                parse2bPing(packet, session);
+//                parse2bPing(packet, session);
             }
         } else {
             if (!session.isOnline()) {
@@ -56,7 +55,7 @@ public class TabListDataHandler implements ClientEventLoopPacketHandler<Clientbo
             if (!session.isInQueue()) {
                 boolean wasOnline = false;
                 Duration wasOnlineDuration = Duration.ZERO;
-                if (session.isOnline()) {
+                if (session.isWasOnline()) {
                     // can occur if we get kicked to queue in certain cases like if the main server restarts
                     // resetting connect time to calculate queue duration correctly
                     wasOnline = true;
@@ -104,7 +103,6 @@ public class TabListDataHandler implements ClientEventLoopPacketHandler<Clientbo
     }
 
     private synchronized void parse2bPing(final ClientboundTabListPacket packet, ClientSession session) {
-        if (CONFIG.client.ping.mode != Config.Client.Ping.Mode.TABLIST) return;
         Optional.of(packet.getFooter())
                 .map(ComponentSerializer::serializePlain)
                 .map(textRaw -> textRaw.replace("\n", ""))

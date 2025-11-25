@@ -4,24 +4,26 @@ import com.google.common.collect.Lists;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.StringReader;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.ParsedCommandNode;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.tree.LiteralCommandNode;
-import com.zenith.command.api.Command;
-import com.zenith.command.api.CommandCategory;
-import com.zenith.command.api.CommandContext;
-import com.zenith.command.api.CommandSource;
-import com.zenith.command.brigadier.BrigadierToMCProtocolLibConverter;
+import com.zenith.command.api.*;
 import com.zenith.command.brigadier.CaseInsensitiveLiteralCommandNode;
+import com.zenith.command.brigadier.McplBrigadierConverter;
 import com.zenith.command.impl.*;
+import com.zenith.network.server.ServerSession;
 import lombok.Getter;
+import lombok.Locked;
 import org.geysermc.mcprotocollib.protocol.data.game.command.CommandNode;
 import org.jspecify.annotations.NonNull;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+import static com.zenith.Globals.DEFAULT_LOG;
 import static com.zenith.Globals.saveConfigAsync;
 import static java.util.Arrays.asList;
 
@@ -71,6 +73,7 @@ public class CommandManager {
         new KillAuraCommand(),
         new LicenseCommand(),
         new MapCommand(),
+        new ModulePriorityCommand(),
         new PathfinderCommand(),
         new PearlLoader(),
         new PlaytimeCommand(),
@@ -104,7 +107,9 @@ public class CommandManager {
         new StatsCommand(),
         new StatusCommand(),
         new TablistCommand(),
+        new TasksCommand(),
         new SpawnPatrolCommand(),
+        new TerminalCommand(),
         new ThemeCommand(),
         new TransferCommand(),
         new UpdateCommand(),
@@ -115,12 +120,13 @@ public class CommandManager {
         new WhitelistCommand()
     );
     private final CommandDispatcher<CommandContext> dispatcher;
-    @Getter private @NonNull CommandNode[] MCProtocolLibCommandNodes;
+    private @NonNull CommandNode[] mcplCommandNodes = new CommandNode[0];
+    private AtomicBoolean mcplCommandNodesStale = new AtomicBoolean(true);
 
     public CommandManager() {
         this.dispatcher = new CommandDispatcher<>();
         registerCommands();
-        syncCommandNodes();
+        mcplCommandNodesStale.set(true);
     }
 
     public void registerCommands() {
@@ -128,9 +134,13 @@ public class CommandManager {
     }
 
     public void registerPluginCommand(Command command) {
+        if (commandsList.contains(command)) {
+            DEFAULT_LOG.warn("Duplicate plugin command being registered: {}", command.commandUsage().getName(), new RuntimeException());
+            return;
+        }
         registerCommand(command);
         commandsList.add(command);
-        syncCommandNodes();
+        mcplCommandNodesStale.set(true);
     }
 
     public List<Command> getCommands() {
@@ -144,12 +154,24 @@ public class CommandManager {
     }
 
     void registerCommand(final Command command) {
-        final LiteralCommandNode<CommandContext> node = dispatcher.register(command.register());
+        LiteralArgumentBuilder<CommandContext> cmdBuilder = command.register();
+        if (dispatcher.getRoot().getChild(cmdBuilder.getLiteral()) != null) {
+            DEFAULT_LOG.warn("Duplicate command being registered: {}", cmdBuilder.getLiteral(), new RuntimeException());
+        }
+        final LiteralCommandNode<CommandContext> node = dispatcher.register(cmdBuilder);
         command.commandUsage().getAliases().forEach(alias -> dispatcher.register(command.redirect(alias, node)));
     }
 
+    @Locked
+    public CommandNode[] getMcplCommandNodes() {
+        if (mcplCommandNodesStale.compareAndSet(true, false)) {
+            syncCommandNodes();
+        }
+        return mcplCommandNodes;
+    }
+
     void syncCommandNodes() {
-        this.MCProtocolLibCommandNodes = BrigadierToMCProtocolLibConverter.convertNodesToMCProtocolLibNodes(this.dispatcher);
+        this.mcplCommandNodes = McplBrigadierConverter.toMcpl(this.dispatcher);
     }
 
     public void execute(final CommandContext context, final ParseResults<CommandContext> parseResults) {
@@ -226,6 +248,17 @@ public class CommandManager {
             stringReader.skip();
         }
         final ParseResults<CommandContext> parse = this.dispatcher.parse(stringReader, CommandContext.create(input, commandSource));
+        return this.dispatcher.getCompletionSuggestions(parse);
+    }
+
+    public CompletableFuture<Suggestions> suggestions(final String input, PlayerCommandSource commandSource, ServerSession session) {
+        var stringReader = new StringReader(downcaseFirstWord(input));
+        if (stringReader.canRead() && stringReader.peek() == '/') {
+            stringReader.skip();
+        }
+        var ctx = CommandContext.create(input, commandSource);
+        ctx.setInGamePlayerInfo(new CommandContext.InGamePlayerInfo(session));
+        final ParseResults<CommandContext> parse = this.dispatcher.parse(stringReader, ctx);
         return this.dispatcher.getCompletionSuggestions(parse);
     }
 }

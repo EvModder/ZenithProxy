@@ -1,7 +1,6 @@
 package com.zenith.module.impl;
 
 import com.github.rfresh2.EventConsumer;
-import com.zenith.Proxy;
 import com.zenith.event.client.ClientBotTick;
 import com.zenith.feature.inventory.InventoryActionRequest;
 import com.zenith.feature.player.ClickTarget;
@@ -19,6 +18,8 @@ import org.geysermc.mcprotocollib.protocol.data.game.item.ItemStack;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundPlayerActionPacket;
 
 import java.util.List;
+import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import static com.github.rfresh2.EventConsumer.of;
 import static com.zenith.Globals.*;
@@ -26,7 +27,6 @@ import static com.zenith.Globals.*;
 public class AutoOmen extends AbstractInventoryModule {
     private int delay = 0;
     private boolean isEating = false;
-    public static final int MOVEMENT_PRIORITY = 600;
     private static final List<Effect> OMEN_EFFECTS = List.of(
         Effect.BAD_OMEN,
         Effect.RAID_OMEN,
@@ -36,7 +36,7 @@ public class AutoOmen extends AbstractInventoryModule {
     private long lastRaidActive = 0L;
 
     public AutoOmen() {
-        super(HandRestriction.EITHER, 3, MOVEMENT_PRIORITY);
+        super(HandRestriction.EITHER, 3);
     }
 
     @Override
@@ -52,24 +52,29 @@ public class AutoOmen extends AbstractInventoryModule {
         );
     }
 
+    @Override
+    public int getPriority() {
+        return Objects.requireNonNullElse(CONFIG.client.extra.autoOmen.priority, 10000);
+    }
+
     public void handleClientTick(final ClientBotTick e) {
         if (hasOmenEffect()) {
-            lastHadOmen = System.currentTimeMillis();
+            lastHadOmen = System.nanoTime();
         }
         if (isRaidActive()) {
-            lastRaidActive = System.currentTimeMillis();
+            lastRaidActive = System.nanoTime();
         }
         if (CACHE.getPlayerCache().getThePlayer().isAlive()
-            && (CONFIG.client.extra.autoOmen.whileRaidActive || (System.currentTimeMillis() - lastRaidActive > CONFIG.client.extra.autoOmen.raidCooldownMs))
-            && (CONFIG.client.extra.autoOmen.whileOmenActive || (System.currentTimeMillis() - lastHadOmen > CONFIG.client.extra.autoOmen.omenCooldownMs))
+            && (CONFIG.client.extra.autoOmen.whileRaidActive || (TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lastRaidActive) > CONFIG.client.extra.autoOmen.raidCooldownMs))
+            && (CONFIG.client.extra.autoOmen.whileOmenActive || (TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - lastHadOmen) > CONFIG.client.extra.autoOmen.omenCooldownMs))
             && CACHE.getPlayerCache().getGameMode() != GameMode.CREATIVE
             && CACHE.getPlayerCache().getGameMode() != GameMode.SPECTATOR
-            && Proxy.getInstance().getOnlineTimeSeconds() > 1) {
+        ) {
             if (delay > 0) {
                 delay--;
                 if (isEating) {
-                    INPUTS.submit(InputRequest.noInput(this, MOVEMENT_PRIORITY));
-                    INVENTORY.submit(InventoryActionRequest.noAction(this, MOVEMENT_PRIORITY));
+                    INPUTS.submit(InputRequest.noInput(this, getPriority()));
+                    INVENTORY.submit(InventoryActionRequest.noAction(this, getPriority()));
                 }
                 return;
             }
@@ -114,8 +119,9 @@ public class AutoOmen extends AbstractInventoryModule {
                 .input(Input.builder()
                     .rightClick(true)
                     .clickTarget(ClickTarget.None.INSTANCE)
+                    .clickRequiresRotation(false)
                     .build())
-                .priority(MOVEMENT_PRIORITY)
+                .priority(getPriority())
                 .build())
             .addInputExecutedListener(future -> {
                 debug("Drinking Omen");
@@ -127,6 +133,8 @@ public class AutoOmen extends AbstractInventoryModule {
     public void handleBotTickStarting(final ClientBotTick.Starting event) {
         delay = 0;
         isEating = false;
+        lastHadOmen = 0L;
+        lastRaidActive = 0L;
     }
 
     @Override

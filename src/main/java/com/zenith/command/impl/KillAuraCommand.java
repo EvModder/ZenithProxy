@@ -8,14 +8,17 @@ import com.zenith.command.api.CommandUsage;
 import com.zenith.discord.Embed;
 import com.zenith.module.impl.KillAura;
 import com.zenith.util.config.Config;
+import com.zenith.util.config.Config.Client.Extra.KillAura.WeaponMaterial;
+import com.zenith.util.config.Config.Client.Extra.KillAura.WeaponType;
 
 import java.util.stream.Collectors;
 
-import static com.mojang.brigadier.arguments.IntegerArgumentType.integer;
 import static com.zenith.Globals.CONFIG;
 import static com.zenith.Globals.MODULE;
+import static com.zenith.command.brigadier.CustomStringArgumentType.getString;
 import static com.zenith.command.brigadier.RegistryDataArgument.entity;
 import static com.zenith.command.brigadier.RegistryDataArgument.getEntity;
+import static com.zenith.command.brigadier.TimeArgument.time;
 import static com.zenith.command.brigadier.ToggleArgumentType.getToggle;
 import static com.zenith.command.brigadier.ToggleArgumentType.toggle;
 
@@ -27,23 +30,25 @@ public class KillAuraCommand extends Command {
             .category(CommandCategory.MODULE)
             .description("""
              Attacks entities near the player.
-             
+
              Custom targets list: https://link.2b2t.vc/1
-             
+
              Aggressive mobs are mobs that are actively targeting and attacking the player.
              """)
             .usageLines(
                 "on/off",
                 "attackDelay <ticks>",
+                "tpsSync on/off",
                 "targetPlayers on/off",
                 "targetHostileMobs on/off",
                 "targetHostileMobs onlyAggressive on/off",
                 "targetNeutralMobs on/off",
                 "targetNeutralMobs onlyAggressive on/off",
-                "targetArmorStands on/off",
                 "targetCustom on/off",
                 "targetCustom add/del <entityType>",
                 "weaponSwitch on/off",
+                "weaponType <any/sword/axe>",
+                "weaponMaterial <any/diamond/netherite>",
                 "raycast on/off",
                 "priority <none/nearest>"
             )
@@ -60,10 +65,15 @@ public class KillAuraCommand extends Command {
                 c.getSource().getEmbed()
                     .title("Kill Aura " + toggleStrCaps(CONFIG.client.extra.killAura.enabled));
             }))
-            .then(literal("attackDelay").then(argument("ticks", integer(0, 1000)).executes(c -> {
+            .then(literal("attackDelay").then(argument("ticks", time(0, 1000)).executes(c -> {
                 CONFIG.client.extra.killAura.attackDelayTicks = c.getArgument("ticks", Integer.class);
                 c.getSource().getEmbed()
                     .title("Attack Delay Ticks Set!");
+            })))
+            .then(literal("tpsSync").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.client.extra.killAura.tpsSync = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("TPS Sync " + toggleStrCaps(CONFIG.client.extra.killAura.tpsSync));
             })))
             .then(literal("targetPlayers").then(argument("toggle", toggle()).executes(c -> {
                 CONFIG.client.extra.killAura.targetPlayers = getToggle(c, "toggle");
@@ -93,15 +103,20 @@ public class KillAuraCommand extends Command {
                         c.getSource().getEmbed()
                             .title("Target Neutral Mobs Only Aggressive " + toggleStrCaps(CONFIG.client.extra.killAura.onlyNeutralAggressive));
                     }))))
-            .then(literal("targetArmorStands").then(argument("toggle", toggle()).executes(c -> {
-                CONFIG.client.extra.killAura.targetArmorStands = getToggle(c, "toggle");
-                c.getSource().getEmbed()
-                    .title("Target Armor Stands " + toggleStrCaps(CONFIG.client.extra.killAura.targetArmorStands));
-            })))
             .then(literal("weaponSwitch").then(argument("toggle", toggle()).executes(c -> {
                 CONFIG.client.extra.killAura.switchWeapon = getToggle(c, "toggle");
                 c.getSource().getEmbed()
                     .title("Weapon Switching " + toggleStrCaps(CONFIG.client.extra.killAura.switchWeapon));
+            })))
+            .then(literal("weaponType").then(argument("type", enumStrings(WeaponType.values())).executes(c -> {
+                CONFIG.client.extra.killAura.weaponType = WeaponType.valueOf(getString(c, "type").toUpperCase());
+                c.getSource().getEmbed()
+                    .title("Weapon Type Set");
+            })))
+            .then(literal("weaponMaterial").then(argument("material", enumStrings(WeaponMaterial.values())).executes(c -> {
+                CONFIG.client.extra.killAura.weaponMaterial = WeaponMaterial.valueOf(getString(c, "material").toUpperCase());
+                c.getSource().getEmbed()
+                    .title("Weapon Material Set");
             })))
             .then(literal("targetCustom")
                 .then(argument("toggle", toggle()).executes(c -> {
@@ -150,9 +165,11 @@ public class KillAuraCommand extends Command {
             .addField("Target Hostile Mobs", toggleStr(CONFIG.client.extra.killAura.targetHostileMobs) + " [onlyAggressive: " + toggleStr(CONFIG.client.extra.killAura.onlyHostileAggressive) + "]")
             .addField("Target Neutral Mobs", toggleStr(CONFIG.client.extra.killAura.targetNeutralMobs) + " [onlyAggressive: " + toggleStr(CONFIG.client.extra.killAura.onlyNeutralAggressive) + "]")
             .addField("Target Custom", toggleStr(CONFIG.client.extra.killAura.targetCustom))
-            .addField("Target Armor Stands", toggleStr(CONFIG.client.extra.killAura.targetArmorStands))
             .addField("Weapon Switching", toggleStr(CONFIG.client.extra.killAura.switchWeapon))
+            .addField("Weapon Type", CONFIG.client.extra.killAura.weaponType.name().toLowerCase())
+            .addField("Weapon Material", CONFIG.client.extra.killAura.weaponMaterial.name().toLowerCase())
             .addField("Attack Delay Ticks", CONFIG.client.extra.killAura.attackDelayTicks)
+            .addField("TPS Sync", toggleStr(CONFIG.client.extra.killAura.tpsSync))
             .addField("Raycast", toggleStr(CONFIG.client.extra.killAura.raycast))
             .addField("Priority", CONFIG.client.extra.killAura.priority.name().toLowerCase())
             .primaryColor();

@@ -1,8 +1,8 @@
 plugins {
     `java-library`
-    id("org.graalvm.buildtools.native") version "0.11.1"
+    id("org.graalvm.buildtools.native") version "0.11.3"
     id("com.gradleup.shadow") version "9.2.2"
-    id("io.freefair.lombok") version "9.0.0"
+    id("io.freefair.lombok") version "9.1.0"
     `maven-publish`
 }
 
@@ -26,9 +26,9 @@ repositories {
     mavenLocal()
 }
 
-val mcplVersion = "1.21.4.29"
+val mcplVersion = "1.21.4.34"
 dependencies {
-    api("com.github.rfresh2:JDA:6.0.19") {
+    api("com.github.rfresh2:JDA:6.1.22") {
         exclude(group = "club.minnced")
         exclude(group = "net.java.dev.jna")
         exclude(group = "com.google.crypto.tink")
@@ -36,7 +36,7 @@ dependencies {
     api("com.github.rfresh2:MCProtocolLib:$mcplVersion") {
         exclude(group = "io.netty")
     }
-    api(platform("io.netty:netty-bom:4.2.6.Final"))
+    api(platform("io.netty:netty-bom:4.2.7.Final"))
     api("io.netty:netty-buffer")
     api("io.netty:netty-codec-haproxy")
     api("io.netty:netty-codec-dns")
@@ -69,31 +69,32 @@ dependencies {
     api("com.github.rfresh2.fastutil.maps:long-double-maps:$fastutilVersion")
     api("com.github.rfresh2.fastutil.queues:int-queues:$fastutilVersion")
     api("com.viaversion:vialoader:4.0.5")
-    api("com.viaversion:viaversion:5.5.0")
-    api("com.viaversion:viabackwards:5.5.0")
+    api("com.viaversion:viaversion-common:5.5.1")
+    api("com.viaversion:viabackwards-common:5.5.1")
+    api("com.viaversion:viarewind-common:4.0.11")
     api("org.jline:jline:3.30.6")
-    api("org.jline:jline-terminal-jni:3.30.6")
     api("ar.com.hjg:pngj:2.1.0")
     api("com.zaxxer:HikariCP:7.0.2")
     api("org.postgresql:postgresql:42.7.8")
     api("org.jdbi:jdbi3-postgres:3.49.6")
     api("com.google.guava:guava:33.5.0-jre")
-    api("ch.qos.logback:logback-classic:1.5.18")
+    api("ch.qos.logback:logback-classic:1.5.21")
     api("org.slf4j:slf4j-api:2.0.17")
     api("org.slf4j:jul-to-slf4j:2.0.17")
     api("com.mojang:brigadier:1.3.10")
-    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.20.0")
+    api("com.fasterxml.jackson.datatype:jackson-datatype-jsr310:2.20.1")
     api("org.jspecify:jspecify:1.0.0")
-    api("net.kyori:adventure-text-logger-slf4j:4.24.0")
+    api("net.kyori:adventure-text-logger-slf4j:4.25.0")
     api("dev.omega24:upnp4j:1.0")
-    testImplementation("org.junit.jupiter:junit-jupiter:5.13.4")
+    testImplementation("org.junit.jupiter:junit-jupiter:6.0.1")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     compileOnly("com.google.auto.service:auto-service-annotations:1.1.1")
     annotationProcessor("com.google.auto.service:auto-service:1.1.1")
+    compileOnly("org.graalvm.sdk:nativeimage:25.0.1")
 }
 
 lombok {
-    version = "1.18.40"
+    version = "1.18.42"
 }
 
 tasks {
@@ -136,6 +137,23 @@ tasks {
     }
     val javaPathTask = register<JavaPathTask>("javaPath") {
         javaLauncher = javaLauncherProvider
+    }
+    val generateCommandDocsTask = register("generateCommandDocs", JavaExec::class.java) {
+        group = "build"
+        description = "Generate command documentation for the wiki"
+        javaLauncher = javaLauncherProvider
+        workingDir = layout.projectDirectory.dir("run").asFile
+        classpath = sourceSets.main.get().runtimeClasspath
+        mainClass.set("com.zenith.util.CommandDocsGenerator")
+        val outputFile = project.layout.buildDirectory.file("Commands.md")
+        args = listOf(outputFile.get().asFile.absolutePath)
+        environment("ZENITH_DEV", "true")
+        outputs.file(outputFile)
+    }
+    val updateWikiTask = register<UpdateWikiTask>("updateWiki") {
+        inputs.files(generateCommandDocsTask.get().outputs.files)
+        wikiDirectory = layout.projectDirectory.dir("docs/wiki").asFile
+        wikiFiles = files(project.layout.buildDirectory.file("Commands.md"))
     }
     processResources {
         dependsOn(releaseTagTask, mcVersionTask, commitHashTask, javaPathTask)
@@ -187,7 +205,7 @@ tasks {
         }
     }
     build {
-        dependsOn(shadowJar)
+        dependsOn(shadowJar, updateWikiTask)
     }
     nativeCompile {
         notCompatibleWithConfigurationCache("not compatible with configuration cache")
@@ -238,8 +256,10 @@ graalvmNative {
                 "--initialize-at-build-time=it.unimi.dsi.fastutil",
                 "--initialize-at-build-time=com.google.common.collect",
                 "--initialize-at-build-time=com.zenith.mc",
+                "--initialize-at-build-time=com.zenith.event",
                 "--initialize-at-run-time=com.zenith.mc.chat_type",
                 "--initialize-at-run-time=sun.net.dns.ResolverConfigurationImpl", // fix for windows builds, exception when doing srv lookups with netty
+                "--features=com.zenith.util.graalvm.ReflectionFeature"
             )
             val pgoPath = providers.environmentVariable("GRAALVM_PGO_PATH").orNull
 			val pgoInstrument = providers.environmentVariable("GRAALVM_PGO_INSTRUMENT").orNull

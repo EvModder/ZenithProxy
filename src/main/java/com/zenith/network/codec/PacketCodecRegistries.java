@@ -8,6 +8,7 @@ import com.zenith.network.client.handler.incoming.scoreboard.*;
 import com.zenith.network.client.handler.incoming.spawn.AddEntityHandler;
 import com.zenith.network.client.handler.incoming.spawn.AddExperienceOrbHandler;
 import com.zenith.network.client.handler.incoming.spawn.SpawnPositionHandler;
+import com.zenith.network.client.handler.outgoing.OutgoingCKeepAliveHandler;
 import com.zenith.network.client.handler.outgoing.OutgoingChatCommandSignedHandler;
 import com.zenith.network.client.handler.outgoing.OutgoingChatHandler;
 import com.zenith.network.client.handler.outgoing.OutgoingContainerClickHandler;
@@ -17,9 +18,7 @@ import com.zenith.network.server.handler.player.incoming.*;
 import com.zenith.network.server.handler.player.outgoing.ClientCommandsOutgoingHandler;
 import com.zenith.network.server.handler.player.postoutgoing.LoginPostHandler;
 import com.zenith.network.server.handler.shared.incoming.*;
-import com.zenith.network.server.handler.shared.outgoing.KeepAliveOutgoingHandler;
-import com.zenith.network.server.handler.shared.outgoing.SLoginFinishedOutgoingHandler;
-import com.zenith.network.server.handler.shared.outgoing.ServerTablistDataOutgoingHandler;
+import com.zenith.network.server.handler.shared.outgoing.*;
 import com.zenith.network.server.handler.shared.postoutgoing.*;
 import com.zenith.network.server.handler.spectator.incoming.*;
 import com.zenith.network.server.handler.spectator.incoming.movement.PlayerPositionRotationSpectatorHandler;
@@ -128,12 +127,13 @@ public final class PacketCodecRegistries {
                 .inbound(ClientboundUpdateTagsPacket.class, UpdateTagsHandler.INSTANCE)
                 .inbound(ClientboundCustomPayloadPacket.class, CustomPayloadHandler.INSTANCE)
                 .inbound(ClientboundPingPacket.class, PingHandler.INSTANCE)
-                .inbound(ClientboundKeepAlivePacket.class, CKeepAliveHandler.INSTANCE)
                 .inbound(ClientboundDisconnectPacket.class, CDisconnectHandler.INSTANCE)
                 .inbound(ClientboundSelectKnownPacks.class, new CSelectKnownPacksHandler())
                 .inbound(ClientboundStoreCookiePacket.class, new CStoreCookieHandler())
                 .inbound(ClientboundCookieRequestPacket.class, new CCookieRequestHandler())
                 .inbound(ClientboundTransferPacket.class, new CTransferHandler())
+                .inbound(ClientboundKeepAlivePacket.class, CKeepAliveHandler.INSTANCE)
+                .outbound(ServerboundKeepAlivePacket.class, OutgoingCKeepAliveHandler.INSTANCE)
                 .postOutbound(ServerboundFinishConfigurationPacket.class, new PostOutgoingFinishConfigurationHandler())
                 .build())
             .state(ProtocolState.GAME, PacketHandlerStateCodec.clientBuilder()
@@ -150,7 +150,6 @@ public final class PacketCodecRegistries {
                 .inbound(ClientboundPlayerChatPacket.class, new PlayerChatHandler())
                 .inbound(ClientboundLevelChunkWithLightPacket.class, new LevelChunkWithLightHandler())
                 .inbound(ClientboundLightUpdatePacket.class, new LightUpdateHandler())
-                .inbound(ClientboundKeepAlivePacket.class, CKeepAliveHandler.INSTANCE)
                 .inbound(ClientboundCommandsPacket.class, new CommandsHandler())
                 .inbound(ClientboundGameEventPacket.class, new GameEventHandler())
                 .inbound(ClientboundLoginPacket.class, new LoginHandler())
@@ -228,9 +227,12 @@ public final class PacketCodecRegistries {
                 .outbound(ServerboundChatPacket.class, new OutgoingChatHandler())
                 .outbound(ServerboundChatCommandSignedPacket.class, new OutgoingChatCommandSignedHandler())
                 .outbound(ServerboundContainerClickPacket.class, new OutgoingContainerClickHandler())
+                .inbound(ClientboundKeepAlivePacket.class, CKeepAliveHandler.INSTANCE)
+                .outbound(ServerboundKeepAlivePacket.class, OutgoingCKeepAliveHandler.INSTANCE)
                 .postOutbound(ServerboundAcceptTeleportationPacket.class, new PostOutgoingAcceptTeleportHandler())
                 .postOutbound(ServerboundConfigurationAcknowledgedPacket.class, new PostOutgoingConfigurationAckHandler())
                 .postOutbound(ServerboundMoveVehiclePacket.class, new PostOutgoingMoveVehicleHandler())
+                .postOutbound(ServerboundPlayerAbilitiesPacket.class, new PostOutgoingPlayerAbilitiesHandler())
                 .postOutbound(ServerboundPlayerCommandPacket.class, new PostOutgoingPlayerCommandHandler())
                 .postOutbound(ServerboundSetCarriedItemPacket.class, new PostOutgoingSetCarriedItemHandler())
                 .postOutbound(ServerboundMovePlayerPosPacket.class, new PostOutgoingPlayerPositionHandler())
@@ -249,6 +251,9 @@ public final class PacketCodecRegistries {
             .setId("server-player")
             .setPriority(2)
             .setActivePredicate((connection) -> !connection.isSpectator())
+            .state(ProtocolState.CONFIGURATION, PacketHandlerStateCodec.serverBuilder()
+                .inbound(ServerboundKeepAlivePacket.class, SPlayerKeepAliveHandler.INSTANCE)
+                .build())
             .state(ProtocolState.GAME, PacketHandlerStateCodec.serverBuilder()
                 .inbound(ServerboundAcceptTeleportationPacket.class, new SAcceptTeleportHandler())
                 .inbound(ServerboundMovePlayerPosRotPacket.class, new SPlayerPositionRotHandler())
@@ -256,6 +261,7 @@ public final class PacketCodecRegistries {
                 .inbound(ServerboundChatCommandSignedPacket.class, new SignedChatCommandHandler())
                 .inbound(ServerboundChatPacket.class, new ChatHandler())
                 .inbound(ServerboundCommandSuggestionPacket.class, new CommandSuggestionHandler())
+                .inbound(ServerboundKeepAlivePacket.class, SPlayerKeepAliveHandler.INSTANCE)
                 .outbound(ClientboundCommandsPacket.class, new ClientCommandsOutgoingHandler())
                 .postOutbound(ClientboundLoginPacket.class, new LoginPostHandler())
                 .build())
@@ -265,6 +271,9 @@ public final class PacketCodecRegistries {
             .setId("server-spectator")
             .setPriority(1)
             .setActivePredicate(ServerSession::isSpectator)
+            .state(ProtocolState.CONFIGURATION, PacketHandlerStateCodec.serverBuilder()
+                .inbound(ServerboundKeepAlivePacket.class, KeepAliveSpectatorHandler.INSTANCE)
+                .build())
             .state(ProtocolState.GAME, PacketHandlerStateCodec.serverBuilder()
                 .allowUnhandledInbound(false)
                 .inbound(ServerboundMovePlayerPosRotPacket.class, new PlayerPositionRotationSpectatorHandler())
@@ -277,6 +286,7 @@ public final class PacketCodecRegistries {
                 .inbound(ServerboundChatCommandPacket.class, new ChatCommandSpectatorHandler())
                 .inbound(ServerboundCommandSuggestionPacket.class, new CommandSuggestionSpectatorHandler())
                 .inbound(ServerboundChatCommandSignedPacket.class, new SignedChatCommandSpectatorHandler())
+                .inbound(ServerboundKeepAlivePacket.class, KeepAliveSpectatorHandler.INSTANCE)
                 .outbound(ClientboundCommandsPacket.class, new ClientCommandsSpectatorOutgoingHandler())
                 .outbound(ClientboundGameEventPacket.class, new GameEventSpectatorOutgoingHandler())
                 .outbound(ClientboundPlayerAbilitiesPacket.class, new PlayerAbilitiesSpectatorOutgoingHandler())
@@ -292,7 +302,6 @@ public final class PacketCodecRegistries {
             .setPriority(0)
             .state(ProtocolState.CONFIGURATION, PacketHandlerStateCodec.serverBuilder()
                 .inbound(ServerboundFinishConfigurationPacket.class, new FinishConfigurationHandler())
-                .inbound(ServerboundKeepAlivePacket.class, KeepAliveHandler.INSTANCE)
                 .inbound(ServerboundClientInformationPacket.class, SClientInformationHandler.INSTANCE)
                 .outbound(ClientboundKeepAlivePacket.class, KeepAliveOutgoingHandler.INSTANCE)
                 .postOutbound(ClientboundFinishConfigurationPacket.class, new ClientFinishConfigurationPostOutgoingHandler())
@@ -314,13 +323,14 @@ public final class PacketCodecRegistries {
                 .build())
             .state(ProtocolState.GAME, PacketHandlerStateCodec.serverBuilder()
                 .inbound(ServerboundConfigurationAcknowledgedPacket.class, new ConfigurationAckHandler())
-                .inbound(ServerboundKeepAlivePacket.class, KeepAliveHandler.INSTANCE)
-                .inbound(ServerboundPingRequestPacket.class, PingRequestHandler.INSTANCE)
                 .inbound(ServerboundPongPacket.class, new PongHandler())
                 .inbound(ServerboundClientInformationPacket.class, SClientInformationHandler.INSTANCE)
+                .inbound(ServerboundChatSessionUpdatePacket.class, new SChatSessionUpdateHandler())
                 .postOutbound(ClientboundPingPacket.class, new PingPostOutgoingHandler())
                 .outbound(ClientboundTabListPacket.class, new ServerTablistDataOutgoingHandler())
                 .outbound(ClientboundKeepAlivePacket.class, KeepAliveOutgoingHandler.INSTANCE)
+                .outbound(ClientboundPlayerChatPacket.class, new SPlayerChatOutgoingHandler())
+                .outbound(ClientboundDeleteChatPacket.class, new SDeleteChatOutgoingHandler())
                 .postOutbound(ClientboundStartConfigurationPacket.class, new ClientStartConfigurationPostOutgoingHandler())
                 .postOutbound(ClientboundTransferPacket.class, new TransferPostOutgoingHandler())
                 .build())

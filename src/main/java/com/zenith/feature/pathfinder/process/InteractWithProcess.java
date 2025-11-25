@@ -30,10 +30,13 @@ import java.util.List;
 
 import static com.zenith.Globals.*;
 
+// todo: raycast setting for choosing path goals
+//  ie. if raycast to target is blocked after near goal, find a new pathing goal that has direct line of sight
 public class InteractWithProcess extends BaritoneProcessHelper {
 
     private @Nullable PathingRequestFuture future;
     private @Nullable InteractTarget target = null;
+    private int tries = 0;
 
     public InteractWithProcess(final Baritone baritone) {
         super(baritone);
@@ -91,6 +94,12 @@ public class InteractWithProcess extends BaritoneProcessHelper {
             onLostControl();
             return new PathingCommand(null, PathingCommandType.DEFER);
         }
+        if (calcFailed) {
+            if (++tries > CONFIG.client.extra.pathfinder.interactWithProcessMaxPathTries) {
+                onLostControl();
+                return null;
+            }
+        }
         return pathingCommand;
     }
 
@@ -101,6 +110,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
             future.complete(false);
         }
         future = null;
+        tries = 0;
     }
 
     @Override
@@ -136,6 +146,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
         public void interact(Hand hand, PlaceTarget placeTarget, Rotation rotation) {
             var in = Input.builder()
                 .hand(hand)
+                .clickRequiresRotation(true)
                 .clickTarget(new ClickTarget.BlockPosition(placeTarget.supportingBlockState().x(), placeTarget.supportingBlockState().y(), placeTarget.supportingBlockState().z()))
                 .rightClick(true);
             // will often need a second tick to place with rotation
@@ -145,7 +156,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
                     .input(in.build())
                     .yaw(rotation.yaw())
                     .pitch(rotation.pitch())
-                    .priority(Baritone.MOVEMENT_PRIORITY + 1)
+                    .priority(Baritone.getPriority() + 1)
                     .build()
             ).addInputExecutedListener(f -> {
                 if (futureSucceeded(f, placeTarget)) {
@@ -189,13 +200,13 @@ public class InteractWithProcess extends BaritoneProcessHelper {
                     if (itemSlot >= 36 && itemSlot <= 44) { // in hotbar
                         INVENTORY.submit(InventoryActionRequest.builder()
                             .owner(this)
-                            .priority(Baritone.MOVEMENT_PRIORITY + 1)
+                            .priority(Baritone.getPriority() + 1)
                             .actions(new SetHeldItem(itemSlot - 36))
                             .build());
                     } else if (itemSlot >= 9 && itemSlot <= 36) { // in main inv
                         INVENTORY.submit(InventoryActionRequest.builder()
                             .owner(this)
-                            .priority(Baritone.MOVEMENT_PRIORITY + 1)
+                            .priority(Baritone.getPriority() + 1)
                             .actions(
                                 new MoveToHotbarSlot(itemSlot, MoveToHotbarAction.SLOT_6),
                                 new SetHeldItem(6))
@@ -203,7 +214,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
                     } else if (itemSlot == 45) { // in offhand
                         INVENTORY.submit(InventoryActionRequest.builder()
                             .owner(this)
-                            .priority(Baritone.MOVEMENT_PRIORITY + 1)
+                            .priority(Baritone.getPriority() + 1)
                             .actions(new WaitAction())
                             .build());
                         hand = Hand.OFF_HAND;
@@ -219,7 +230,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
                 }
             }
             // todo: some antistuck func here
-            int rangeSq = MathHelper.clamp(((int) Math.pow(BOT.getBlockReachDistance(), 2)) - 1, 1, 4);
+            int rangeSq = Math.max(2, ((int) Math.pow(BOT.getBlockReachDistance() - 1, 2)));
             return new PathingCommand(new GoalNear(x, y, z, rangeSq), PathingCommandType.REVALIDATE_GOAL_AND_PATH);
         }
 
@@ -361,13 +372,13 @@ public class InteractWithProcess extends BaritoneProcessHelper {
                             INVENTORY.submit(InventoryActionRequest.builder()
                                 .owner(this)
                                 .actions(new MoveToHotbarSlot(toolSlot, MoveToHotbarAction.from(0)))
-                                .priority(Baritone.MOVEMENT_PRIORITY)
+                                .priority(Baritone.getPriority())
                                 .build());
                         } else if (toolSlot <= 44) { // in hotbar
                             INVENTORY.submit(InventoryActionRequest.builder()
                                 .owner(this)
                                 .actions(new SetHeldItem(toolSlot - 36))
-                                .priority(Baritone.MOVEMENT_PRIORITY)
+                                .priority(Baritone.getPriority())
                                 .build());
                         } else if (toolSlot == 45) { // in offhand
                             hand = Hand.OFF_HAND;
@@ -378,7 +389,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
                 return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
             }
             // todo: some antistuck func here
-            int rangeSq = MathHelper.clamp(((int) Math.pow(BOT.getBlockReachDistance(), 2)) - 1, 1, 4);
+            int rangeSq = Math.max(2, ((int) Math.pow(BOT.getBlockReachDistance() - 1, 2)));
             return new PathingCommand(new GoalNear(x, y, z, rangeSq), PathingCommandType.REVALIDATE_GOAL_AND_PATH);
         }
 
@@ -428,6 +439,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
         public void interact(Hand hand) {
             var in = Input.builder()
                 .hand(hand)
+                .clickRequiresRotation(true)
                 .clickTarget(new ClickTarget.BlockPosition(x, y, z))
                 .leftClick(true);
             Position center = World.blockInteractionCenter(x, y, z);
@@ -438,7 +450,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
                     .input(in.build())
                     .yaw(rot.getX())
                     .pitch(rot.getY())
-                    .priority(Baritone.MOVEMENT_PRIORITY + 1)
+                    .priority(Baritone.getPriority() + 1)
                     .build()
             ).addInputExecutedListener(f -> {
                 if (futureSucceeded(f)) {
@@ -470,7 +482,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
                 return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
             }
             // todo: some antistuck func here
-            int rangeSq = MathHelper.clamp(((int) Math.pow(BOT.getBlockReachDistance(), 2)) - 1, 1, 4);
+            int rangeSq = Math.max(2, ((int) Math.pow(BOT.getBlockReachDistance() - 1, 2)));
             return new PathingCommand(new GoalNear(x, y, z, rangeSq), PathingCommandType.REVALIDATE_GOAL_AND_PATH);
         }
 
@@ -507,6 +519,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
         public void interact() {
             var in = Input.builder()
                 .hand(Hand.MAIN_HAND)
+                .clickRequiresRotation(true)
                 .clickTarget(new ClickTarget.BlockPosition(x, y, z));
             if (leftClick) {
                 in.leftClick(true);
@@ -521,7 +534,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
                     .input(in.build())
                     .yaw(rot.getX())
                     .pitch(rot.getY())
-                    .priority(Baritone.MOVEMENT_PRIORITY + 1)
+                    .priority(Baritone.getPriority() + 1)
                     .build())
                 .addInputExecutedListener(future -> {
                     if (futureSucceeded(future)) {
@@ -550,6 +563,15 @@ public class InteractWithProcess extends BaritoneProcessHelper {
         private boolean succeeded = false;
 
         @Override
+        public String toString() {
+            return "InteractWithEntity{" +
+                "entityRef=" + entityRef.get() +
+                ", leftClick=" + leftClick +
+                ", succeeded=" + succeeded +
+                '}';
+        }
+
+        @Override
         public PathingCommand pathingCommand() {
             if (succeeded || !targetValid()) return null;
             var entity = entityRef.get();
@@ -562,8 +584,9 @@ public class InteractWithProcess extends BaritoneProcessHelper {
                 return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
             }
             // todo: some antistuck func here
-            int rangeSq = MathHelper.clamp(((int) Math.pow(BOT.getEntityInteractDistance(), 2)) - 1, 1, 4);
-            return new PathingCommand(new GoalNear(entity.blockPos(), rangeSq), PathingCommandType.REVALIDATE_GOAL_AND_PATH);
+            int rangeSq = Math.max(2, ((int) Math.pow(BOT.getEntityInteractDistance() - 1, 2)));
+            BlockPos entityPos = new BlockPos(MathHelper.floorI(entity.getX()), Math.round(entity.getY()), MathHelper.floorI(entity.getZ()));
+            return new PathingCommand(new GoalNear(entityPos, rangeSq), PathingCommandType.REVALIDATE_GOAL_AND_PATH);
         }
 
         @Override
@@ -604,6 +627,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
             if (entity == null) return;
             var in = Input.builder()
                 .hand(Hand.MAIN_HAND)
+                .clickRequiresRotation(true)
                 .clickTarget(new ClickTarget.EntityInstance(entity));
             if (leftClick) {
                 in.leftClick(true);
@@ -617,7 +641,7 @@ public class InteractWithProcess extends BaritoneProcessHelper {
                     .input(in.build())
                     .yaw(rot.getX())
                     .pitch(rot.getY())
-                    .priority(Baritone.MOVEMENT_PRIORITY + 1)
+                    .priority(Baritone.getPriority() + 1)
                     .build())
                 .addInputExecutedListener(future -> {
                     if (futureSucceeded(future)) {

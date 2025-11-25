@@ -8,7 +8,7 @@ import com.zenith.command.api.Command;
 import com.zenith.command.api.CommandCategory;
 import com.zenith.command.api.CommandContext;
 import com.zenith.command.api.CommandUsage;
-import com.zenith.discord.Embed;
+import com.zenith.feature.api.mclogs.MclogsApi;
 import com.zenith.feature.gui.GuiBuilder;
 import com.zenith.feature.gui.SlotBuilder;
 import com.zenith.mc.item.ItemRegistry;
@@ -20,6 +20,8 @@ import org.geysermc.mcprotocollib.protocol.data.game.entity.Effect;
 import org.geysermc.mcprotocollib.protocol.data.game.inventory.ContainerType;
 import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentTypes;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundRemoveMobEffectPacket;
+
+import java.nio.file.Path;
 
 import static com.mojang.brigadier.arguments.IntegerArgumentType.getInteger;
 import static com.mojang.brigadier.arguments.IntegerArgumentType.integer;
@@ -52,7 +54,10 @@ public class DebugCommand extends Command {
                 "debugLogs on/off",
                 "chunkCacheFullbright on/off",
                 "defaultClientRenderDistance <int>",
-                "lockFile on/off"
+                "lockFile on/off",
+                "uploadLog",
+                "uploadDebugLog",
+                "passthroughResourcePacks on/off"
             )
             .build();
     }
@@ -65,7 +70,6 @@ public class DebugCommand extends Command {
                     CONFIG.debug.packetLog.enabled = getToggle(c, "toggle");
                     c.getSource().getEmbed()
                         .title("Packet Log " + toggleStrCaps(CONFIG.debug.packetLog.enabled));
-                    return OK;
                 }))
                 .then(literal("client")
                     .then(argument("toggle", toggle()).executes(c -> {
@@ -82,7 +86,6 @@ public class DebugCommand extends Command {
                         }
                         c.getSource().getEmbed()
                             .title("Client Packet Log " + toggleStrCaps(toggle));
-                        return OK;
                     })))
                 .then(literal("server")
                     .then(argument("toggle", toggle()).executes(c -> {
@@ -99,7 +102,6 @@ public class DebugCommand extends Command {
                         }
                         c.getSource().getEmbed()
                             .title("Server Packet Log " + toggleStrCaps(toggle));
-                        return OK;
                     })))
                 .then(literal("filter")
                     .then(argument("filter", wordWithChars()).executes(c -> {
@@ -108,26 +110,24 @@ public class DebugCommand extends Command {
                             CONFIG.debug.packetLog.packetFilter = "";
                         c.getSource().getEmbed()
                             .title("Packet Log Filter Set: " + CONFIG.debug.packetLog.packetFilter);
-                        return OK;
                     })))
                 .then(literal("logLevelDebug").then(argument("toggle", toggle()).executes(c -> {
                     CONFIG.debug.packetLog.logLevelDebug = getToggle(c, "toggle");
                     c.getSource().getEmbed()
                         .title("Log Level Debug " + toggleStrCaps(CONFIG.debug.packetLog.logLevelDebug));
-                    return OK;
                 }))))
             .then(literal("sync")
                 .then(literal("inventory").executes(c -> {
                     PlayerCache.inventorySync();
                     c.getSource().getEmbed()
                         .title("Inventory Synced");
-                    return OK;
+                    c.getSource().getData().put("noDefaultEmbed", true);
                 }))
                 .then(literal("chunks").executes(c -> {
                     ChunkCache.sync();
                     c.getSource().getEmbed()
                         .title("Synced Chunks");
-                    return OK;
+                    c.getSource().getData().put("noDefaultEmbed", true);
                 })))
             .then(literal("clearEffects").executes(c -> {
                 CACHE.getPlayerCache().getThePlayer().getPotionEffectMap().clear();
@@ -139,13 +139,12 @@ public class DebugCommand extends Command {
                 }
                 c.getSource().getEmbed()
                     .title("Cleared Effects");
-                return OK;
+                c.getSource().getData().put("noDefaultEmbed", true);
             }))
             .then(literal("kickDisconnect").then(argument("toggle", toggle()).executes(c -> {
                 CONFIG.debug.kickDisconnect = getToggle(c, "toggle");
                 c.getSource().getEmbed()
                     .title("Kick Disconnect " + toggleStrCaps(CONFIG.debug.kickDisconnect));
-                return OK;
             })))
             // insta disconnect
             .then(literal("dc").executes(c -> {
@@ -156,25 +155,26 @@ public class DebugCommand extends Command {
                 CONFIG.debug.debugLogs = getToggle(c, "toggle");
                 c.getSource().getEmbed()
                     .title("Debug Logs " + toggleStrCaps(CONFIG.debug.debugLogs));
-                return OK;
             })))
             .then(literal("terminalDebugLogs").then(argument("toggle", toggle()).executes(c -> {
                 CONFIG.debug.terminalDebugLogs = getToggle(c, "toggle");
                 c.getSource().getEmbed()
                     .title("Terminal Debug Logs " + toggleStrCaps(CONFIG.debug.terminalDebugLogs));
-                return OK;
             })))
             .then(literal("chunkCacheFullbright").then(argument("toggle", toggle()).executes(c -> {
                 CONFIG.debug.server.cache.fullbrightChunkBlocklight = getToggle(c, "toggle");
                 c.getSource().getEmbed()
                     .title("Chunk Cache Fullbright " + toggleStrCaps(CONFIG.debug.server.cache.fullbrightChunkBlocklight));
-                return OK;
+            })))
+            .then(literal("maxCachedMaps").then(argument("count", integer(0)).executes(c -> {
+                CONFIG.debug.server.cache.maxCachedMaps = getInteger(c, "count");
+                c.getSource().getEmbed()
+                    .title("Max Cached Maps Set");
             })))
             .then(literal("binaryNbtComponentSerializer").then(argument("toggle", toggle()).executes(c -> {
                 MinecraftTypes.useBinaryNbtComponentSerializer = getToggle(c, "toggle");
                 c.getSource().getEmbed()
                     .title("Binary NBT Component Serializer " + toggleStrCaps(MinecraftTypes.useBinaryNbtComponentSerializer));
-                return OK;
             })))
             .then(literal("defaultClientRenderDistance").then(argument("dist", integer(1, 256)).executes(c -> {
                 CONFIG.client.defaultClientRenderDistance = getInteger(c, "dist");
@@ -246,27 +246,81 @@ public class DebugCommand extends Command {
                                 .build())
                             .build())
                         .build());
+                c.getSource().getData().put("noDefaultEmbed", true);
             }))
             .then(literal("lockFile").then(argument("toggle", toggle()).executes(c -> {
                 CONFIG.debug.lockFile = getToggle(c, "toggle");
                 c.getSource().getEmbed()
                     .title("Lock File " + toggleStrCaps(CONFIG.debug.lockFile));
+            })))
+            .then(literal("uploadLog").executes(c -> {
+                uploadLog(c.getSource(), "log/latest.log");
+            }))
+            .then(literal("uploadDebugLog").executes(c -> {
+                uploadLog(c.getSource(), "log/debug.log");
+            }))
+            .then(literal("passthroughResourcePacks").then(argument("toggle", toggle()).executes(c -> {;
+                CONFIG.debug.passthroughResourcePacks = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("Passthrough Resource Packs " + toggleStrCaps(CONFIG.debug.passthroughResourcePacks));
+            })))
+            .then(literal("inputManagerDebugLogs").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.debug.inputManagerDebugLogs = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("Input Manager Debug Logs " + toggleStrCaps(CONFIG.debug.inputManagerDebugLogs));
+            })))
+            .then(literal("botPitchPrecisionClamping").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.debug.botPitchPrecisionClamping = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("Bot Pitch Precision Clamping " + toggleStrCaps(CONFIG.debug.botPitchPrecisionClamping));
+            })))
+            .then(literal("botRotateBeforeInteract").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.debug.botRotateBeforeInteract = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("Bot Rotate Before Interact " + toggleStrCaps(CONFIG.debug.botRotateBeforeInteract));
             })));
     }
 
+    private static void uploadLog(CommandContext c, String path) {
+        MclogsApi.INSTANCE.uploadLog(Path.of(path))
+            .ifPresentOrElse(response -> {
+                if (response.success()) {
+                    c.getEmbed()
+                        .title("Log Uploaded")
+                        .description("**Link**: " + response.url())
+                        .addField("Warning", "May contain sensitive information like coords, be careful who you share the link with");
+                } else {
+                    c.getEmbed()
+                        .title("Error Uploading Log")
+                        .description(response.error())
+                        .errorColor();
+                }
+            }, () -> {
+                c.getEmbed()
+                    .title("Log Upload Failed")
+                    .errorColor();
+            });
+        c.getData().put("noDefaultEmbed", true);
+    }
+
     @Override
-    public void defaultEmbed(final Embed builder) {
-        builder
-            .addField("Packet Log", toggleStr(CONFIG.debug.packetLog.enabled))
-            .addField("Client Packet Log", toggleStr(CONFIG.debug.packetLog.clientPacketLog.received))
-            .addField("Server Packet Log", toggleStr(CONFIG.debug.packetLog.serverPacketLog.received))
-            .addField("Packet Log Filter", CONFIG.debug.packetLog.packetFilter)
-            .addField("Kick Disconnect", toggleStr(CONFIG.debug.kickDisconnect))
-            .addField("Debug Logs", toggleStr(CONFIG.debug.debugLogs))
-            .addField("Terminal Debug Logs", toggleStr(CONFIG.debug.terminalDebugLogs))
-            .addField("Chunk Cache Fullbright", toggleStr(CONFIG.debug.server.cache.fullbrightChunkBlocklight))
-            .addField("Default Client Render Distance", CONFIG.client.defaultClientRenderDistance)
-            .addField("Lock File", toggleStr(CONFIG.debug.lockFile))
+    public void defaultHandler(final CommandContext ctx) {
+        if (!ctx.getData().containsKey("noDefaultEmbed")) {
+            ctx.getEmbed()
+                .addField("Packet Log", toggleStr(CONFIG.debug.packetLog.enabled))
+                .addField("Client Packet Log", toggleStr(CONFIG.debug.packetLog.clientPacketLog.received))
+                .addField("Server Packet Log", toggleStr(CONFIG.debug.packetLog.serverPacketLog.received))
+                .addField("Packet Log Filter", CONFIG.debug.packetLog.packetFilter)
+                .addField("Kick Disconnect", toggleStr(CONFIG.debug.kickDisconnect))
+                .addField("Debug Logs", toggleStr(CONFIG.debug.debugLogs))
+                .addField("Terminal Debug Logs", toggleStr(CONFIG.debug.terminalDebugLogs))
+                .addField("Chunk Cache Fullbright", toggleStr(CONFIG.debug.server.cache.fullbrightChunkBlocklight))
+                .addField("Max Cached Maps", CONFIG.debug.server.cache.maxCachedMaps)
+                .addField("Default Client Render Distance", CONFIG.client.defaultClientRenderDistance)
+                .addField("Lock File", toggleStr(CONFIG.debug.lockFile))
+                .addField("Passthrough Resource Packs", toggleStr(CONFIG.debug.passthroughResourcePacks));
+        }
+        ctx.getEmbed()
             .primaryColor();
     }
 }

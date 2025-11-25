@@ -1,14 +1,22 @@
 package com.zenith.plugin;
 
+import com.zenith.Globals;
+import com.zenith.discord.Embed;
 import com.zenith.event.plugin.PluginLoadFailureEvent;
 import com.zenith.event.plugin.PluginLoadedEvent;
-import com.zenith.plugin.api.*;
+import com.zenith.plugin.api.ConfigSerializer;
+import com.zenith.plugin.api.PluginInfo;
+import com.zenith.plugin.api.PluginInstance;
+import com.zenith.plugin.api.ZenithProxyPlugin;
 import com.zenith.util.ImageInfo;
 import lombok.SneakyThrows;
+import org.geysermc.mcprotocollib.protocol.codec.MinecraftCodec;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-import java.io.*;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
@@ -81,12 +89,19 @@ public class PluginManager {
         var potentialJars = findPotentialPluginJars();
         int potentialPluginCount = potentialJars.size();
         if (potentialPluginCount > 0) {
-            PLUGIN_LOG.warn("""
+            DISCORD.sendEmbedMessage(Embed.builder()
+                .title("Potential Plugins Found")
+                .description("""
                 Plugins are not supported on the `linux` release channel.
-                Detected {} potential plugin jars in the plugins directory.
 
-                To use plugins, switch to the `java` channel: `channel set java <mcVersion>`
-                """, potentialPluginCount);
+                To use plugins, switch to the `java` release channel:
+
+                `channel set java %s`
+
+                Detected %d potential plugin jars in the plugins directory.
+                """.formatted(Objects.requireNonNullElse(LAUNCH_CONFIG.getMcVersion(), MinecraftCodec.CODEC.getMinecraftVersion()), potentialPluginCount))
+                .errorColor()
+            );
         }
     }
 
@@ -338,29 +353,9 @@ public class PluginManager {
 
     @SneakyThrows
     private <T> T loadPluginConfig(String fileName, Class<T> clazz, ConfigSerializer serializer) {
-        try {
-            PLUGIN_LOG.debug("Loading plugin config: {}", fileName);
-            File configFile = resolveConfigFile(fileName, serializer.fileExtension());
-            T config;
-            if (configFile.exists()) {
-                try (Reader reader = new FileReader(configFile)) {
-                    config = serializer.read(clazz, reader);
-                } catch (IOException e) {
-                    throw new RuntimeException("Unable to load plugin config: " + fileName, e);
-                }
-                PLUGIN_LOG.info("Plugin config: {} loaded.", fileName);
-            } else {
-                config = isKotlinObject(clazz)
-                    ? getKotlinObject(clazz)
-                    : clazz.getDeclaredConstructor().newInstance();
-                PLUGIN_LOG.info("Plugin config: {} not found, loaded default config", fileName);
-            }
-            return config;
-        } catch (final Throwable e) {
-            PLUGIN_LOG.error("Unable to load plugin config: {}", fileName, e);
-            PLUGIN_LOG.error("Config must be manually fixed or deleted");
-            throw e;
-        }
+        PLUGIN_LOG.debug("Loading plugin config: {}", fileName);
+        File configFile = resolveConfigFile(fileName, serializer.fileExtension());
+        return Globals.loadConfig(configFile, clazz, serializer);
     }
 
     private File resolveConfigFile(String fileName, String fileExtension) {

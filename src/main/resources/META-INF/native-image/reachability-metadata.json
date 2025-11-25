@@ -1189,6 +1189,9 @@
       "type": "com.viaversion.viaversion.api.minecraft.item.data.SuspiciousStewEffect[]"
     },
     {
+      "type": "com.viaversion.viaversion.libs.fastutil.longs.Long2ObjectOpenHashMap"
+    },
+    {
       "type": "com.viaversion.viaversion.libs.flare.fastutil.Int2ObjectSyncMapImpl$ExpungingEntryImpl",
       "fields": [
         {
@@ -1573,6 +1576,24 @@
       ]
     },
     {
+      "type": "com.zenith.event.client.ClientConnectEvent"
+    },
+    {
+      "type": "com.zenith.event.client.ClientDeathEvent"
+    },
+    {
+      "type": "com.zenith.event.client.ClientDisconnectEvent"
+    },
+    {
+      "type": "com.zenith.event.client.ClientOnlineEvent"
+    },
+    {
+      "type": "com.zenith.event.player.PlayerConnectedEvent"
+    },
+    {
+      "type": "com.zenith.event.player.PlayerDisconnectedEvent"
+    },
+    {
       "type": "com.zenith.feature.api.ProfileData"
     },
     {
@@ -1610,6 +1631,20 @@
           "name": "<init>",
           "parameterTypes": [
             "boolean",
+            "java.lang.String"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.feature.api.mclogs.model.MclogsResponse",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "boolean",
+            "java.lang.String",
+            "java.lang.String",
             "java.lang.String"
           ]
         }
@@ -2072,6 +2107,23 @@
         {
           "name": "<init>",
           "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.feature.tasks.Task",
+      "fields": [
+        {
+          "name": "action"
+        },
+        {
+          "name": "condition"
+        },
+        {
+          "name": "continuation"
+        },
+        {
+          "name": "id"
         }
       ]
     },
@@ -2581,6 +2633,34 @@
       "allDeclaredFields": true
     },
     {
+      "type": "com.zenith.util.config.Config$Client$Extra$KillAura$WeaponMaterial",
+      "fields": [
+        {
+          "name": "ANY"
+        },
+        {
+          "name": "DIAMOND"
+        },
+        {
+          "name": "NETHERITE"
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.util.config.Config$Client$Extra$KillAura$WeaponType",
+      "fields": [
+        {
+          "name": "ANY"
+        },
+        {
+          "name": "AXE"
+        },
+        {
+          "name": "SWORD"
+        }
+      ]
+    },
+    {
       "type": "com.zenith.util.config.Config$Client$Extra$Pathfinder",
       "allDeclaredFields": true,
       "methods": [
@@ -2710,6 +2790,29 @@
       ]
     },
     {
+      "type": "com.zenith.util.config.Config$Client$Extra$Tasks",
+      "fields": [
+        {
+          "name": "enabled"
+        },
+        {
+          "name": "logCommandActionOutput"
+        },
+        {
+          "name": "taskCommandExecutedNotification"
+        },
+        {
+          "name": "tasks"
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
       "type": "com.zenith.util.config.Config$Client$Extra$Utility",
       "allDeclaredFields": true,
       "methods": [
@@ -2800,6 +2903,34 @@
         {
           "name": "<init>",
           "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.util.config.Config$Client$KeepAliveHandling",
+      "fields": [
+        {
+          "name": "keepAliveMode"
+        },
+        {
+          "name": "keepAliveQueueTimeoutMs"
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.util.config.Config$Client$KeepAliveHandling$KeepAliveMode",
+      "fields": [
+        {
+          "name": "INDEPENDENT"
+        },
+        {
+          "name": "PASSTHROUGH"
         }
       ]
     },
@@ -3008,6 +3139,34 @@
         {
           "name": "<init>",
           "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.util.config.Config$Server$ChatSigning",
+      "fields": [
+        {
+          "name": "mode"
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.util.config.Config$Server$ChatSigning$ChatSigningMode",
+      "fields": [
+        {
+          "name": "DISGUISED"
+        },
+        {
+          "name": "PASSTHROUGH"
+        },
+        {
+          "name": "SYSTEM"
         }
       ]
     },
@@ -4475,6 +4634,13 @@
         {
           "name": "alignedSlice",
           "parameterTypes": [
+            "int"
+          ]
+        },
+        {
+          "name": "slice",
+          "parameterTypes": [
+            "int",
             "int"
           ]
         }

@@ -9,11 +9,12 @@ import com.zenith.feature.inventory.InventoryActionRequest;
 import com.zenith.feature.player.*;
 import com.zenith.feature.player.raycast.RaycastHelper;
 import com.zenith.mc.item.ItemRegistry;
+import com.zenith.mc.item.ToolTier;
+import com.zenith.mc.item.ToolType;
 import com.zenith.util.math.MathHelper;
-import it.unimi.dsi.fastutil.ints.IntSet;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;
 import org.cloudburstmc.math.vector.Vector2f;
-import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.type.ByteEntityMetadata;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.MetadataTypes;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType;
 import org.geysermc.mcprotocollib.protocol.data.game.item.ItemStack;
 import org.jspecify.annotations.Nullable;
@@ -21,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import java.lang.ref.WeakReference;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 
 import static com.github.rfresh2.EventConsumer.of;
@@ -47,20 +49,18 @@ public class KillAura extends AbstractInventoryModule {
     private int delay = 0;
     private final WeakReference<EntityLiving> nullRef = new WeakReference<>(null);
     private WeakReference<EntityLiving> attackTarget = nullRef;
-    public static final int MOVEMENT_PRIORITY = 500;
-    private final IntSet swords = IntSet.of(
-        ItemRegistry.DIAMOND_SWORD.id(),
-        ItemRegistry.NETHERITE_SWORD.id(),
-        ItemRegistry.IRON_SWORD.id()
-    );
-    private final IntSet axes = IntSet.of(
-        ItemRegistry.NETHERITE_AXE.id(),
-        ItemRegistry.DIAMOND_AXE.id(),
-        ItemRegistry.IRON_AXE.id()
-    );
 
     public KillAura() {
-        super(HandRestriction.MAIN_HAND, 1, MOVEMENT_PRIORITY);
+        super(HandRestriction.MAIN_HAND, 1);
+        // convert legacy config
+        if (CONFIG.client.extra.killAura.targetArmorStands) {
+            if (!CONFIG.client.extra.killAura.customTargets.contains(EntityType.ARMOR_STAND)) {
+                CONFIG.client.extra.killAura.customTargets.add(EntityType.ARMOR_STAND);
+            }
+            CONFIG.client.extra.killAura.targetArmorStands = false;
+            CONFIG.client.extra.killAura.targetCustom = true;
+            saveConfigAsync();
+        }
     }
 
     public boolean isActive() {
@@ -81,6 +81,11 @@ public class KillAura extends AbstractInventoryModule {
     }
 
     @Override
+    public int getPriority() {
+        return Objects.requireNonNullElse(CONFIG.client.extra.killAura.actionPriority, 8000);
+    }
+
+    @Override
     public void onDisable() {
         delay = 0;
         attackTarget = nullRef;
@@ -94,7 +99,7 @@ public class KillAura extends AbstractInventoryModule {
                 if (!hasRotation(target)) {
                     rotateTo(target);
                 }
-                INVENTORY.submit(InventoryActionRequest.noAction(this, MOVEMENT_PRIORITY - 1));
+                INVENTORY.submit(InventoryActionRequest.noAction(this, getPriority() - 1));
             }
             return;
         }
@@ -104,13 +109,13 @@ public class KillAura extends AbstractInventoryModule {
                 if (!attackTarget.refersTo(target))
                     attackTarget = new WeakReference<>(target);
                 if (switchToWeapon()) {
-                    INVENTORY.submit(InventoryActionRequest.noAction(this, MOVEMENT_PRIORITY - 1));
+                    INVENTORY.submit(InventoryActionRequest.noAction(this, getPriority() - 1));
                     attack(target).addInputExecutedListener(this::onAttackInputExecuted);
                 } else {
                     // stop while doing inventory actions
                     INPUTS.submit(InputRequest.builder()
                         .owner(this)
-                        .priority(MOVEMENT_PRIORITY - 1)
+                        .priority(getPriority() - 1)
                         .build());
                 }
                 return;
@@ -123,8 +128,15 @@ public class KillAura extends AbstractInventoryModule {
     private void onAttackInputExecuted(InputRequestFuture future) {
         if (future.getClickResult() instanceof ClickResult.LeftClickResult leftClickResult
             && leftClickResult.getEntity() != null && leftClickResult.getEntity() == attackTarget.get()) {
-            delay = CONFIG.client.extra.killAura.attackDelayTicks;
+            delay = computeAttackDelayTicks();
         }
+    }
+
+    private int computeAttackDelayTicks() {
+        var delay = CONFIG.client.extra.killAura.attackDelayTicks;
+        if (!CONFIG.client.extra.killAura.tpsSync) return delay;
+        // Scale delay by server slowdown: at 10 TPS, wait twice as long; at 20 TPS, unchanged.
+        return MathHelper.ceilI(delay * (20.0 / MathHelper.clamp(TPS.getTPSValue(), 1.0, 20.0)));
     }
 
     @Nullable
@@ -157,19 +169,28 @@ public class KillAura extends AbstractInventoryModule {
                 && !PLAYER_LISTS.getSpectatorWhitelist().contains(player.getUuid());
 
         } else if (entity instanceof EntityStandard e) {
-            if (CONFIG.client.extra.killAura.targetHostileMobs) {
-                if (hostileEntities.contains(e.getEntityType()))
-                    return !CONFIG.client.extra.killAura.onlyHostileAggressive || isAggressive(entity);
+            if (CONFIG.client.extra.killAura.targetCustom) {
+                if (CONFIG.client.extra.killAura.customTargets.contains(e.getEntityType())) {
+                    return true;
+                }
             }
-            if (CONFIG.client.extra.killAura.targetArmorStands) {
-                if (e.getEntityType() == EntityType.ARMOR_STAND) return true;
+            if (CONFIG.client.extra.killAura.targetHostileMobs) {
+                if (hostileEntities.contains(e.getEntityType())) {
+                    if (CONFIG.client.extra.killAura.onlyHostileAggressive) {
+                        if (isAggressive(e)) return true;
+                    } else {
+                        return true;
+                    }
+                }
             }
             if (CONFIG.client.extra.killAura.targetNeutralMobs) {
-                if (neutralEntities.contains(e.getEntityType()))
-                    return !CONFIG.client.extra.killAura.onlyNeutralAggressive || isAggressive(entity);
-            }
-            if (CONFIG.client.extra.killAura.targetCustom) {
-                return CONFIG.client.extra.killAura.customTargets.contains(e.getEntityType());
+                if (neutralEntities.contains(e.getEntityType())) {
+                    if (CONFIG.client.extra.killAura.onlyNeutralAggressive) {
+                        if (isAggressive(e)) return true;
+                    } else {
+                        return true;
+                    }
+                }
             }
         }
         return false;
@@ -177,13 +198,9 @@ public class KillAura extends AbstractInventoryModule {
 
     private static boolean isAggressive(final EntityLiving entity) {
         // https://minecraft.wiki/w/Java_Edition_protocol/Entity_metadata#Mob
-        var byteMetadata = entity.getMetadata().get(15);
-        if (byteMetadata == null) return false;
-        if (byteMetadata instanceof ByteEntityMetadata byteData) {
-            var data = byteData.getPrimitiveValue() & 0x04;
-            return data != 0;
-        }
-        return false;
+        var byteData = entity.getMetadataValue(15, MetadataTypes.BYTE, Byte.class);
+        if (byteData == null) return false;
+        return (byteData & 0x04) != 0;
     }
 
     private void handleBotTickStopped(final ClientBotTick.Stopped event) {
@@ -203,7 +220,7 @@ public class KillAura extends AbstractInventoryModule {
                 .build())
             .yaw(rotation.getX())
             .pitch(rotation.getY())
-            .priority(MOVEMENT_PRIORITY)
+            .priority(getPriority())
             .build());
     }
 
@@ -214,7 +231,7 @@ public class KillAura extends AbstractInventoryModule {
             .owner(this)
             .yaw(rotation.getX())
             .pitch(rotation.getY())
-            .priority(MOVEMENT_PRIORITY)
+            .priority(getPriority())
             .build());
     }
 
@@ -318,7 +335,21 @@ public class KillAura extends AbstractInventoryModule {
     }
 
     private boolean isWeapon(int id) {
-        return swords.contains(id) || axes.contains(id);
+        var itemData = ItemRegistry.REGISTRY.get(id);
+        if (itemData == null) return false;
+        var toolTag = itemData.toolTag();
+        if (toolTag == null) return false;
+        boolean typeMatch = switch (CONFIG.client.extra.killAura.weaponType) {
+            case ANY -> toolTag.type() == ToolType.SWORD || toolTag.type() == ToolType.AXE;
+            case SWORD -> toolTag.type() == ToolType.SWORD;
+            case AXE -> toolTag.type() == ToolType.AXE;
+        };
+        if (!typeMatch) return false;
+        return switch (CONFIG.client.extra.killAura.weaponMaterial) {
+            case ANY -> toolTag.tier() == ToolTier.IRON || toolTag.tier() == ToolTier.DIAMOND || toolTag.tier() == ToolTier.NETHERITE;
+            case DIAMOND -> toolTag.tier() == ToolTier.DIAMOND;
+            case NETHERITE -> toolTag.tier() == ToolTier.NETHERITE;
+        };
     }
 
     @Override

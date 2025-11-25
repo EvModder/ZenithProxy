@@ -154,7 +154,7 @@ public class DiscordBot {
             jda.awaitReady();
         } catch (ShutdownException e) {
             if (e.getShutdownReason() == ShutdownReason.DISALLOWED_INTENTS) {
-                throw new RuntimeException("You must enable MESSAGE CONTENT INTENT on the Discord developer website: https://i.imgur.com/iznLeDV.png");
+                throw new RuntimeException("You must enable MESSAGE CONTENT INTENT on the Discord developer website: https://wiki.2b2t.vc/_assets/img/discord-setup/DiscordSetup2.png");
             }
             throw e;
         } catch (InterruptedException e) {
@@ -200,7 +200,6 @@ public class DiscordBot {
             COMMAND.execute(context);
             final MessageCreateData request = commandEmbedOutputToMessage(context);
             if (request != null) {
-                DISCORD_LOG.debug("Discord bot response: {}", request.toData().toJson());
                 mainChannel.sendMessage(request).queue();
                 CommandOutputHelper.logEmbedOutputToTerminal(context.getEmbed());
             }
@@ -243,6 +242,7 @@ public class DiscordBot {
     public void setBotNickname(final String nick) {
         if (!isRunning()) return;
         try {
+            if (nick.equals(mainChannel.getGuild().getSelfMember().getNickname())) return;
             mainChannel.getGuild().getSelfMember().modifyNickname(nick).complete();
         } catch (PermissionException e) {
             DISCORD_LOG.warn("Failed updating bot's nickname. Check that the bot has correct permissions: {}", e.getMessage());

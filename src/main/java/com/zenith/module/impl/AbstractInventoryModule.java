@@ -2,10 +2,7 @@ package com.zenith.module.impl;
 
 import com.zenith.cache.data.inventory.Container;
 import com.zenith.feature.inventory.InventoryActionRequest;
-import com.zenith.feature.inventory.actions.DropMouseStack;
-import com.zenith.feature.inventory.actions.InventoryAction;
-import com.zenith.feature.inventory.actions.MoveToHotbarSlot;
-import com.zenith.feature.inventory.actions.SetHeldItem;
+import com.zenith.feature.inventory.actions.*;
 import com.zenith.module.api.Module;
 import lombok.Getter;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.EquipmentSlot;
@@ -28,17 +25,17 @@ import static java.util.Objects.nonNull;
 public abstract class AbstractInventoryModule extends Module {
     private final HandRestriction handRestriction;
     private final int targetMainHandHotbarSlot;
-    private final int inventoryActionPriority;
     @Getter
     private @Nullable Hand hand = null;
 
-    public AbstractInventoryModule(HandRestriction handRestriction, int targetMainHandHotbarSlot, int inventoryActionPriority) {
+    public AbstractInventoryModule(HandRestriction handRestriction, int targetMainHandHotbarSlot) {
         this.handRestriction = handRestriction;
         this.targetMainHandHotbarSlot = targetMainHandHotbarSlot;
-        this.inventoryActionPriority = inventoryActionPriority;
     }
 
     public abstract boolean itemPredicate(ItemStack itemStack);
+
+    public abstract int getPriority();
 
     public enum HandRestriction {
         MAIN_HAND,
@@ -88,6 +85,10 @@ public abstract class AbstractInventoryModule extends Module {
             ItemStack itemStack = inventory.get(i);
             if (nonNull(itemStack) && itemPredicate(itemStack)) {
                 List<InventoryAction> actions = new ArrayList<>();
+                var openContainer = CACHE.getPlayerCache().getInventoryCache().getOpenContainerId();
+                if (openContainer != 0) {
+                    actions.add(new CloseContainer(openContainer));
+                }
                 if (CACHE.getPlayerCache().getInventoryCache().getMouseStack() != Container.EMPTY_STACK) {
                     actions.add(new DropMouseStack(ClickItemAction.LEFT_CLICK));
                 }
@@ -99,7 +100,7 @@ public abstract class AbstractInventoryModule extends Module {
                 INVENTORY.submit(InventoryActionRequest.builder()
                     .owner(this)
                     .actions(actions)
-                    .priority(inventoryActionPriority)
+                    .priority(getPriority())
                     .build());
                 return true;
             }

@@ -5,6 +5,7 @@ import re
 
 import requests
 
+import launch_platform
 from jdk_install import get_java_executable, JavaInstallType
 from launch_config import read_launch_config_file
 from launch_platform import get_public_ip, check_port_in_use
@@ -30,6 +31,11 @@ def setup_execute(config):
     else:
         release_channel = "java"
     print("")
+
+    if release_channel == "java":
+        if not launch_platform.validate_java_system(config, JavaInstallType.USER_PROMPT):
+            critical_error("Setup cancelled")
+        print("")
 
     # while True:
     #     print("Select a Minecraft version: (1/2)")
@@ -61,6 +67,7 @@ def setup_execute(config):
     config.repo_name = "ZenithProxy"
     config.write_launch_config()
     print("launch_config.json written successfully!")
+    print("")
 
     if os.path.exists("config.json"):
         while True:
@@ -151,8 +158,8 @@ def setup_execute(config):
     print("")
 
     if discord_bot:
-        print("See README.md for Discord bot setup instructions")
-        print("https://github.com/rfresh2/ZenithProxy/?tab=readme-ov-file#discord-bot-setup")
+        print("See Discord bot setup instructions:")
+        print("https://wiki.2b2t.vc/Discord-Bot-Guide")
         discord_verify_verbose = False
         while True:
             print("Enter Discord bot token:")
@@ -333,11 +340,11 @@ def setup_unattended(config):
         # some env vars have default values
         port = os.getenv("ZENITH_PORT", 25565)
         ip = os.getenv("ZENITH_IP", "localhost")
-        if os.getenv("ZENITH_DISCORD_DISABLED") is not None:
-            # idk how exactly you plan to do anything after this but ok
-            discord_bot = False
-        else:
-            discord_bot = True
+        discord_disabled_env = os.getenv("ZENITH_DISCORD_DISABLED")
+
+        # idk how exactly you plan to do anything after this but ok
+        discord_bot = discord_disabled_env is None or discord_disabled_env.lower() in ['false', '0', 'no']
+        if discord_bot:
             discord_bot_token = os.getenv("ZENITH_DISCORD_TOKEN")
             if discord_bot_token is None:
                 critical_error("ZENITH_DISCORD_TOKEN env variable must be set in unattended mode")
