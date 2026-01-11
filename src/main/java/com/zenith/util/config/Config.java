@@ -942,8 +942,8 @@ public final class Config {
         public boolean mentionOnSpectatorDisconnected = false;
         public boolean mentionRoleOnPrioUpdate = true;
         public boolean mentionRoleOnDeviceCodeAuth = true;
-        public boolean manageProfileImage = true;
-        public boolean manageNickname = true;
+        public boolean manageProfileImage = false;
+        public boolean manageNickname = false;
         public boolean manageDescription = true;
         public boolean managePresence = true;
         public boolean showNonWhitelistLoginIP = true;

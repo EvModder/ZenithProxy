@@ -18,4 +18,8 @@ This is a fork by [EvModder](https://github.com/EvModder), adapted for my own pe
 ### [Download latest jar](https://github.com/EvModder/ZenithProxy/releases/download/latest-1.21.4/ZenithProxy.jar)
 ^ Manual download; this fork does not use the upstream's auto-update protocol.
 
+## Changes in this fork
+
+- **Discord presence:** Shared bot descriptions, slower updates, fewer timestamps.
+
 To rfresh: Feel free to copy anything here you like, or DM for a PR.
