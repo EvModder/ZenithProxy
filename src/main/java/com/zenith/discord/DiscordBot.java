@@ -100,7 +100,8 @@ public class DiscordBot {
         }
         this.presenceUpdateFuture = EXECUTOR.scheduleWithFixedDelay(
             this::tickPresence, 0L,
-            15L, // discord rate limit
+            51L
+            // 15L, // discord rate limit
             TimeUnit.SECONDS);
     }
 
@@ -298,20 +299,22 @@ public class DiscordBot {
                     );
                 }
             }
+            String presence;
             if (MODULE.get(AutoReconnect.class).autoReconnectIsInProgress()) {
-                jda.getPresence().setPresence(OnlineStatus.IDLE, Activity.customStatus("AutoReconnecting..."));
+                jda.getPresence().setPresence(OnlineStatus.IDLE, Activity.customStatus(presence="AutoReconnecting..."));
                 return;
             }
             if (Proxy.getInstance().isInQueue()) {
-                jda.getPresence().setPresence(OnlineStatus.IDLE, Activity.customStatus(Queue.queuePositionStr()));
+                jda.getPresence().setPresence(OnlineStatus.IDLE, Activity.customStatus(presence=Queue.queuePositionStr()));
             } else if (Proxy.getInstance().isConnected()) {
                 jda.getPresence().setPresence(
                     OnlineStatus.ONLINE,
-                    Activity.customStatus((Proxy.getInstance().isOn2b2t() ? "2b2t" : CONFIG.client.server.address)
-                                              + " [" + Proxy.getInstance().getOnlineTimeString() + "]"));
+                    Activity.customStatus(presence=((Proxy.getInstance().isOn2b2t() ? "2b2t" : CONFIG.client.server.address)
+                                              + " [" + Proxy.getInstance().getOnlineTimeString() + "]")));
             } else {
-                jda.getPresence().setPresence(OnlineStatus.DO_NOT_DISTURB, Activity.customStatus("Disconnected"));
+                jda.getPresence().setPresence(OnlineStatus.DO_NOT_DISTURB, Activity.customStatus(presence="Disconnected"));
             }
+            updateBotInfo2(presence);
         } catch (final Throwable e) {
             DISCORD_LOG.error("Failed updating discord presence. Check that the bot has correct permissions: {}", e.getMessage());
             DISCORD_LOG.debug("Failed updating discord presence. Check that the bot has correct permissions.", e);
@@ -336,30 +339,50 @@ public class DiscordBot {
             DISCORD.setBotNickname(CONFIG.authentication.username + " | ZenithProxy");
     }
 
-    public void updateBotInfo() {
-        updateBotNickname();
+    private void updateBotInfo2(String presence){
         if (CONFIG.discord.manageDescription){
             String oldDesc = jda.retrieveApplicationInfo().complete().getDescription();
-            int s = oldDesc.indexOf("Online:"), e = oldDesc.indexOf("GitHub:");
-            String nameList = "";
-            if(s != -1 && e != -1){
+            String nameList = null;
+            String[] nameListArr = null;
+            int idx = oldDesc.indexOf('\n');
+            if(idx != -1){
+                nameList = oldDesc.substring(idx+1);
+                nameListArr = nameList.split("\\n");
                 // 1 in 10 chance of clearing nameList (proportional to # of bots)
-                if(Math.abs(ThreadLocalRandom.current().nextInt()%(10*nameList.split(",").length)) != 0){
-                    nameList = oldDesc.substring(s+7, e).replaceAll("\\s+", "");
+                if(Math.abs(ThreadLocalRandom.current().nextInt()%(5+10*nameListArr.length)) != 0){
+                    nameList = null;
                 }
             }
-            if(!nameList.contains(CONFIG.authentication.username)){
-                if(!nameList.isEmpty()) nameList += ",";
-                nameList += CONFIG.authentication.username;
+            String myNameLineStart = "  " + CONFIG.authentication.username.substring(0, 3) + " ";
+            String myNameLine = myNameLineStart + (presence == null ? "" : presence);
+            if(nameList == null) nameList = "**Online**:\n" + myNameLine;
+            else{
+                // Insert into correct alphabetical position
+                StringBuilder builder = new StringBuilder("**Online:**");
+                boolean added = false;
+                for(String line : nameListArr){
+                    if(!added){
+                        if(line.startsWith(myNameLineStart)){
+                            added = true;
+                            builder.append('\n').append(myNameLine);
+                            continue;
+                        }
+                        if(line.compareTo(myNameLineStart) > 0){
+                            added = true;
+                            builder.append('\n').append(myNameLine);
+                        }
+                    }
+                    builder.append('\n').append(line);
+                }
+                if(!added) builder.append('\n').append(myNameLine);
+                nameList = builder.toString();
             }
-            DISCORD.setBotDescription(
-                """
-                **Online:**
-                  "%s"
-                **GitHub:**
-                  https://github.com/EvModder/ZenithProxy
-                """.formatted(LAUNCH_CONFIG.version, nameList));
+            DISCORD.setBotDescription(nameList);
         }
+    }
+    public void updateBotInfo() {
+        updateBotNickname();
+        updateBotInfo2(null)
     }
 
     public void updateBotAvatar() {
