@@ -171,6 +171,23 @@ public class World {
         });
     }
 
+    public boolean containsLiquid(final LocalizedCollisionBox cb) {
+        var minX = MathHelper.floorI(cb.minX());
+        var maxX = MathHelper.ceilI(cb.maxX());
+        var minY = MathHelper.floorI(cb.minY());
+        var maxY = MathHelper.ceilI(cb.maxY());
+        var minZ = MathHelper.floorI(cb.minZ());
+        var maxZ = MathHelper.ceilI(cb.maxZ());
+        for (int x = minX; x < maxX; x++) {
+            for (int y = minY; y < maxY; y++) {
+                for (int z = minZ; z < maxZ; z++) {
+                    if (getFluidState(getBlockStateId(x, y, z)) != null) return true;
+                }
+            }
+        }
+        return false;
+    }
+
     public void getEntityCollisionBoxes(final LocalizedCollisionBox cb, final List<LocalizedCollisionBox> results, Predicate<Entity> filter) {
         for (var entity : CACHE.getEntityCache().getEntities().values()) {
             if (!filter.test(entity)) continue;
@@ -250,7 +267,7 @@ public class World {
         for (int i = 0; i < blockPosList.size(); i++) {
             var blockPos = blockPosList.getLong(i);
             var blockState = getBlockState(blockPos);
-            if (BLOCK_DATA.isAir(blockState.block())) continue; // air
+            if (blockState.block().isAir()) continue; // air
             List<LocalizedCollisionBox> blockStateCBs = blockState.getLocalizedCollisionBoxes();
             for (int j = 0; j < blockStateCBs.size(); j++) {
                 if (blockStateCBs.get(j).intersects(cb)) {
@@ -268,7 +285,7 @@ public class World {
         for (int i = 0; i < blockPosList.size(); i++) {
             var blockPos = blockPosList.getLong(i);
             var blockState = getBlockState(blockPos);
-            if (BLOCK_DATA.isAir(blockState.block())) continue; // air
+            if (blockState.block().isAir()) continue; // air
             blockStates.add(blockState);
         }
         return blockStates;
@@ -369,7 +386,7 @@ public class World {
     }
 
     public boolean blocksMotion(Block block) {
-        return block != BlockRegistry.COBWEB && block != BlockRegistry.BAMBOO_SAPLING && block.isBlock();
+        return block != BlockRegistry.COBWEB && block != BlockRegistry.BAMBOO_SAPLING && block.solidBlock();
     }
 
     public float getFluidHeight(final @Nullable FluidState fluidState) {

@@ -266,6 +266,7 @@ public final class Config {
                 public boolean enabled = false;
                 public boolean ignoreFriends = true;
                 public boolean targetOnlyNakeds = true;
+                public boolean targetOnlyBedrock = false;
                 public boolean targetAttackers = true;
                 public boolean stickyTargeting = true;
                 public boolean nether = true;
@@ -331,6 +332,13 @@ public final class Config {
                 public boolean showConnectionMessages = false;
                 public boolean insertClickableLinks = false;
                 public boolean hide2b2tActionBarText = false;
+                public boolean replace2b2tChatCommands = false;
+                public boolean ignoreReplace2b2tChatCommandWhileDatabaseOn = true;
+                public boolean prefixChats = false;
+                public String prefix = ">";
+                public boolean suffixChats = false;
+                public String suffix = "| Sent from my ZenithProxy";
+                public boolean randomSuffix = false;
             }
 
             public static final class AutoTotem {
@@ -830,6 +838,7 @@ public final class Config {
 
     public static class Plugins {
         public boolean enabled = true;
+        public boolean blockCommandsUntilLoaded = false;
     }
 
     public static final class InteractiveTerminal {

@@ -117,7 +117,7 @@ Prints the current status of ZenithProxy, the in-game player, and modules.
 
 Restarts and updates ZenithProxy if `autoUpdate` is enabled
 
-**Aliases:** `restart` / `shutdown` / `reboot`
+**Aliases:** `restart` / `reboot`
 
 **Usage**
 
@@ -734,6 +734,17 @@ The `timeout` arguments configures how long until players are kicked due no pack
   ```serverConnection chatSigning mode <disguised/passthrough/system>```
 
 
+### shutdown
+
+Shuts down ZenithProxy, without letting the launcher restart it.
+
+**Aliases:** `exit`
+
+**Usage**
+
+  ```shutdown```
+
+
 ### spectatorEntity
 
 Changes the current spectator entity. Only usable by spectators
@@ -823,11 +834,23 @@ Where Colors Are Used:
 
 ### transfer
 
-Transfers connected players to a destination MC server
+Transfers connected players to a destination MC server.
+
+
+
+If no player is specified, all currently connected players will be transferred.
+
+If no port is specified, it will be looked up via DNS, or default to 25565.
 
 **Usage**
 
   ```transfer <address>```
+
+  ```transfer <address> <playerName>```
+
+  ```transfer <address> <port>```
+
+  ```transfer <address> <port> <playerName>```
 
 
 ### unsupported
@@ -1694,7 +1717,7 @@ and impact of the offset being discovered.
 
 ### extraChat
 
-Hide certain types of messages in-game or in the terminal chat log.
+Extra chat features and modifications.
 
 **Usage**
 
@@ -1713,6 +1736,18 @@ Hide certain types of messages in-game or in the terminal chat log.
   ```extraChat hide2b2tActionBarText on/off```
 
   ```extraChat whisperCommand <command>```
+
+  ```extraChat replace2b2tChatCommands on/off```
+
+  ```extraChat prefix on/off```
+
+  ```extraChat prefix set <prefix>```
+
+  ```extraChat suffix on/off```
+
+  ```extraChat suffix set <suffix>```
+
+  ```extraChat suffix random on/off```
 
 
 ### ignore
@@ -2226,6 +2261,8 @@ Patrols spawn and paths to any player it finds, killing them if you have kill au
 
   ```spawnPatrol targetOnlyNakeds on/off```
 
+  ```spawnPatrol targetOnlyBedrock on/off```
+
   ```spawnPatrol stickyTargeting on/off```
 
   ```spawnPatrol targetAttackers on/off```
@@ -2315,6 +2352,8 @@ To add players to the friends list see the `friends` command.
   ```visualRange enter whisper cooldown <seconds>```
 
   ```visualRange enter whisper command <command>```
+
+  ```visualRange enter whisper whilePlayerConnected on/off```
 
   ```visualRange leave on/off```
 

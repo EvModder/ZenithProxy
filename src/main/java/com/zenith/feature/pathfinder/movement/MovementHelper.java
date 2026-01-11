@@ -66,8 +66,7 @@ public final class MovementHelper {
                 return true;
             }
             FluidState fluidState = World.getFluidState(state);
-            float level = World.getFluidHeight(fluidState);
-            if (level == 0) return true; // source blocks like to flow horizontally
+            if (fluidState != null && fluidState.source()) return true; // source blocks like to flow horizontally
 
             // everything else will prefer flowing down
             return !isLiquid(BlockStateInterface.getBlock(x, y -1, z)); // assume everything is in a static state
@@ -97,7 +96,7 @@ public final class MovementHelper {
 
     public static Ternary canWalkThroughBlockState(int blockStateId) {
         Block block = BlockStateInterface.getBlock(blockStateId);
-        if (BLOCK_DATA.isAir(block)) {
+        if (block.isAir()) {
             return YES;
         }
         if (block == BlockRegistry.FIRE
@@ -211,7 +210,7 @@ public final class MovementHelper {
 
     public static boolean fullyPassableBlockState(int state) {
         Block block = BlockStateInterface.getBlock(state);
-        if (BLOCK_DATA.isAir(block)) { // early return for most common case
+        if (block.isAir()) { // early return for most common case
             return true;
         }
         // exceptions - blocks that are isPassable true, but we can't actually jump through
@@ -270,7 +269,7 @@ public final class MovementHelper {
          *     }
          */
         Block block = BlockStateInterface.getBlock(blockStateId);
-        if (BLOCK_DATA.isAir(block)) {
+        if (block.isAir()) {
             // early return for common cases hehe
             return true;
         }
