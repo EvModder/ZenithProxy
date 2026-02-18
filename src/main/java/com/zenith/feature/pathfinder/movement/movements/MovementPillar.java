@@ -56,11 +56,12 @@ public class MovementPillar extends Movement {
 //        }
         int toBreak = context.getId(x, y + 2, z);
         Block toBreakBlock = BlockStateInterface.getBlock(toBreak);
-        if (toBreakBlock.name().endsWith("fence_gate")) { // see issue #172
+        if (toBreakBlock.blockTags().contains(BlockTags.FENCE_GATES)) { // see issue #172
             return COST_INF;
         }
+        Block srcUp = null;
         if (MovementHelper.isWater(toBreakBlock) && MovementHelper.isWater(fromBlock)) { // TODO should this also be allowed if toBreakBlock is air?
-            Block srcUp = context.getBlock(x, y + 1, z);
+            srcUp = context.getBlock(x, y + 1, z);
             if (MovementHelper.isWater(srcUp)) {
                 return LADDER_UP_ONE_COST; // allow ascending pillars of water, but only if we're already in one
             }
@@ -82,7 +83,7 @@ public class MovementPillar extends Movement {
             // if we're standing on water and assumeWalkOnWater is false, we must have ascended to here, or sneak backplaced, so it is possible to pillar again
             return COST_INF;
         }
-        if ((fromBlock == BlockRegistry.LILY_PAD || fromBlock.name().endsWith("_carpet")) && World.isFluid(fromDownBlock)) {
+        if ((fromBlock == BlockRegistry.LILY_PAD || fromBlock.blockTags().contains(BlockTags.WOOL_CARPETS)) && World.isFluid(fromDownBlock)) {
             // to ascend here we'd have to break the block we are standing on
             return COST_INF;
         }
@@ -94,16 +95,16 @@ public class MovementPillar extends Movement {
             if (toBreakBlock == BlockRegistry.LADDER || toBreakBlock == BlockRegistry.VINE) {
                 hardness = 0; // we won't actually need to break the ladder / vine because we're going to use it
             } else {
-//                BlockState check = context.get(x, y + 3, z); // the block on top of the one we're going to break, could it fall on us?
-//                if (check.block() instanceof FallingBlock) {
-//                    // see MovementAscend's identical check for breaking a falling block above our head
-//                    if (srcUp == null) {
-//                        srcUp = context.get(x, y + 1, z);
-//                    }
-//                    if (!(toBreakBlock instanceof FallingBlock) || !(srcUp.getBlock() instanceof FallingBlock)) {
-//                        return COST_INF;
-//                    }
-//                }
+                var check = context.getBlock(x, y + 3, z); // the block on top of the one we're going to break, could it fall on us?
+                if (check.fallingBlock()) {
+                    // see MovementAscend's identical check for breaking a falling block above our head
+                    if (srcUp == null) {
+                        srcUp = context.getBlock(x, y + 1, z);
+                    }
+                    if (!toBreakBlock.fallingBlock() || !srcUp.fallingBlock()) {
+                        return COST_INF;
+                    }
+                }
                 // this is commented because it may have had a purpose, but it's very unclear what it was. it's from the minebot era.
                 //if (!MovementHelper.canWalkOn(context, chkPos, check) || MovementHelper.canWalkThrough(context, chkPos, check)) {//if the block above where we want to break is not a full block, don't do it
                 // TODO why does canWalkThrough mean this action is COST_INF?
@@ -239,9 +240,11 @@ public class MovementPillar extends Movement {
                             .map(rot -> new MovementState.MovementTarget(rot, true))
                             .ifPresent(state::setTarget);
                     state.setInput(PathInput.JUMP, false); // breaking is like 5x slower when you're jumping
+                    state.setClickTarget(src);
                     state.setInput(PathInput.LEFT_CLICK_BLOCK, true);
                     blockIsThere = false;
                 } else if (ctx.player().isSneaking() && (ctx.isLookingAt(src.below()) || ctx.isLookingAt(src)) && ctx.player().getY() > dest.y() + 0.1) {
+                    state.setClickTarget(ctx.getSelectedBlock().orElse(null));
                     state.setInput(PathInput.RIGHT_CLICK_BLOCK, true);
                 }
             }

@@ -105,6 +105,7 @@ public final class MineProcess extends BaritoneProcessHelper implements IBariton
                     baritone.getLookBehavior().updateRotation(rot.get());
                     MovementHelper.switchToBestToolFor(World.getBlock(pos));
                     if (ctx.isLookingAt(pos) || ctx.playerRotations().isReallyCloseTo(rot.get())) {
+                        baritone.getInputOverrideHandler().setClickTarget(pos);
                         baritone.getInputOverrideHandler().setInputForceState(PathInput.LEFT_CLICK_BLOCK, true);
                     }
                     return new PathingCommand(null, PathingCommandType.REQUEST_PAUSE);
@@ -216,7 +217,7 @@ public final class MineProcess extends BaritoneProcessHelper implements IBariton
     }
 
     private Goal coalesce(BlockPos loc, List<BlockPos> locs, CalculationContext context) {
-        boolean assumeVerticalShaftMine = true;
+        boolean assumeVerticalShaftMine = !BlockStateInterface.getBlock(loc.above()).fallingBlock();
         boolean upwardGoal = internalMiningGoal(loc.above(), context, locs);
         boolean downwardGoal = internalMiningGoal(loc.below(), context, locs);
         boolean doubleDownwardGoal = internalMiningGoal(loc.below(2), context, locs);
@@ -449,8 +450,16 @@ public final class MineProcess extends BaritoneProcessHelper implements IBariton
             return null;
         }
         if (!CONFIG.client.extra.pathfinder.allowBreak) {
-            PATH_LOG.warn("Unable to mine when allowBreak is off!");
-            return null;
+            var allowBreakAnyway = this.filter.getBlockSet().stream()
+                .filter(block -> CONFIG.client.extra.pathfinder.allowBreakAnyway.contains(block.name()))
+                .collect(Collectors.toSet());
+            if (allowBreakAnyway.isEmpty()) {
+                // todo: discord noti?
+                error("Unable to mine when allowBreak is off and target block is not in allowBreakAnyway!");
+                return null;
+            } else {
+                return new BlockOptionalMetaLookup(allowBreakAnyway);
+            }
         }
         return filter;
     }

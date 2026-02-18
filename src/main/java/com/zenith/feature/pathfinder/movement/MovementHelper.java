@@ -51,14 +51,13 @@ public final class MovementHelper {
         // we assume that it's ALWAYS okay to break the block thats ABOVE liquid
         int state = BlockStateInterface.getId(x, y, z);
         Block block = BlockStateInterface.getBlock(state);
-//        if (!directlyAbove // it is fine to mine a block that has a falling block directly above, this (the cost of breaking the stacked fallings) is included in cost calculations
-//            // therefore if directlyAbove is true, we will actually ignore if this is falling
-//            && block instanceof FallingBlock // obviously, this check is only valid for falling blocks
-//            && Baritone.settings().avoidUpdatingFallingBlockRegistry.value // and if the setting is enabled
-//            && FallingBlock.isFree(bsi.get0(x, y - 1, z))) { // and if it would fall (i.e. it's unsupported)
-//        ) {
-//            return true; // dont break a block that is adjacent to unsupported gravel because it can cause really weird stuff
-//        }
+        if (!directlyAbove // it is fine to mine a block that has a falling block directly above, this (the cost of breaking the stacked fallings) is included in cost calculations
+            // therefore if directlyAbove is true, we will actually ignore if this is falling
+            && block.fallingBlock() // obviously, this check is only valid for falling blocks
+            && CONFIG.client.extra.pathfinder.avoidUpdatingFallingBlocks // and if the setting is enabled
+            && freeForFallingBlock(x, y - 1, z)) { // and if it would fall (i.e. it's unsupported)
+            return true; // dont break a block that is adjacent to unsupported gravel because it can cause really weird stuff
+        }
         // only pure liquids for now
         // waterlogged blocks can have closed bottom sides and such
         if (isLiquid(block)) {
@@ -72,6 +71,15 @@ public final class MovementHelper {
             return !isLiquid(BlockStateInterface.getBlock(x, y -1, z)); // assume everything is in a static state
         }
         return World.getFluidState(x, y, z) != null;
+    }
+
+    static boolean freeForFallingBlock(int x, int y, int z) {
+        var block = BlockStateInterface.getBlock(x, y, z);
+        return block.isAir()
+            || block == BlockRegistry.FIRE || block == BlockRegistry.SOUL_FIRE
+            || isLiquid(block)
+            || block.replaceable();
+
     }
 
     public static boolean canWalkThrough(BlockPos pos) {
@@ -107,9 +115,9 @@ public final class MovementHelper {
             || block == BlockRegistry.COCOA
             || block.name().endsWith("_skull")
             || block == BlockRegistry.BUBBLE_COLUMN
-            || block.name().endsWith("shulker_box")
-            || block.name().endsWith("_slab")
-            || block.name().endsWith("_trapdoor")
+            || block.blockTags().contains(BlockTags.SHULKER_BOXES)
+            || block.blockTags().contains(BlockTags.SLABS)
+            || block.blockTags().contains(BlockTags.TRAPDOORS)
             || block == BlockRegistry.HONEY_BLOCK
             || block == BlockRegistry.END_ROD
             || block == BlockRegistry.SWEET_BERRY_BUSH
@@ -128,14 +136,14 @@ public final class MovementHelper {
 //        if (Baritone.settings().blocksToAvoid.value.contains(block)) {
 //            return NO;
 //        }
-        if (block.name().endsWith("_door") || block.name().endsWith("fence_gate")) {
+        if (block.blockTags().contains(BlockTags.DOORS) || block.blockTags().contains(BlockTags.FENCE_GATES)) {
             // TODO this assumes that all doors in all mods are openable
             if (block == BlockRegistry.IRON_DOOR) {
                 return NO;
             }
             return YES;
         }
-        if (block.name().endsWith("_carpet")) {
+        if (block.blockTags().contains(BlockTags.WOOL_CARPETS)) {
             return MAYBE;
         }
         if (block == BlockRegistry.SNOW) {
@@ -155,7 +163,7 @@ public final class MovementHelper {
             }
 
         }
-        if (block.name().endsWith("cauldron")) {
+        if (block.blockTags().contains(BlockTags.CAULDRONS)) {
             return NO;
         }
         if (BlockStateInterface.isPathfindable(blockStateId)) {
@@ -168,7 +176,7 @@ public final class MovementHelper {
     public static boolean canWalkThroughPosition(int x, int y, int z, int blockStateId) {
         Block block = BlockStateInterface.getBlock(blockStateId);
 
-        if (block.name().endsWith("_carpet")) {
+        if (block.blockTags().contains(BlockTags.WOOL_CARPETS)) {
             return canWalkOn(x, y - 1, z);
         }
 
@@ -221,14 +229,16 @@ public final class MovementHelper {
             || block == BlockRegistry.LADDER
             || block == BlockRegistry.COCOA
             || block == BlockRegistry.AZALEA || block == BlockRegistry.FLOWERING_AZALEA
-            || block.name().endsWith("_door")
-            || block.name().endsWith("fence_gate")
+            || block.blockTags().contains(BlockTags.DOORS)
+            || block.blockTags().contains(BlockTags.FENCE_GATES)
             || block == BlockRegistry.SNOW
             || World.isFluid(block)
-            || block.name().endsWith("_trapdoor")
-            || block.name().startsWith("end_portal")
+            || block.blockTags().contains(BlockTags.TRAPDOORS)
+            || block == BlockRegistry.END_PORTAL
+            || block == BlockRegistry.END_PORTAL_FRAME
             || block.name().endsWith("_skull")
-            || block.name().endsWith("shulker_box")) {
+            || block.blockTags().contains(BlockTags.SHULKER_BOXES)
+        ) {
             return false;
         }
         // door, fence gate, liquid, trapdoor have been accounted for, nothing else uses the world or pos parameters
@@ -293,7 +303,7 @@ public final class MovementHelper {
         }
 
         var block = BlockStateInterface.getBlock(doorPos);
-        if (!block.name().endsWith("_door")) {
+        if (!block.blockTags().contains(BlockTags.DOORS)) {
             return true;
         }
         var blockStateId = BlockStateInterface.getId(doorPos);
@@ -326,7 +336,7 @@ public final class MovementHelper {
 
         Block block = BlockStateInterface.getBlock(gatePos);
         int state = BlockStateInterface.getId(gatePos);
-        if (!(block.name().endsWith("fence_gate"))) {
+        if (!(block.blockTags().contains(BlockTags.FENCE_GATES))) {
             return true;
         }
 
@@ -381,21 +391,21 @@ public final class MovementHelper {
         if (block == BlockRegistry.GLASS || block.name().endsWith("stained_glass")) {
             return YES;
         }
-        if (block.name().endsWith("_trapdoor")) {
+        if (block.blockTags().contains(BlockTags.TRAPDOORS)) {
             var openProperty = World.getBlockStateProperty(blockStateId, BlockStateProperties.OPEN);
             if (openProperty == null || openProperty) {
                 return NO;
             }
             return YES;
         }
-        if (block.name().endsWith("_stairs")) {
+        if (block.blockTags().contains(BlockTags.STAIRS)) {
             return YES;
         }
         if (isWater(block)) {
             return MAYBE;
         }
 //        MovementHelper.isLava(block);
-        if (block.name().endsWith("_slab")) {
+        if (block.blockTags().contains(BlockTags.SLABS)) {
             return YES;
         }
         return NO;
@@ -561,6 +571,12 @@ public final class MovementHelper {
             double result = 1 / strVsBlock;
             result += context.breakBlockAdditionalCost;
             result *= mult;
+            if (includeFalling) {
+                var above = BlockStateInterface.getBlock(x, y + 1, z);
+                if (above.fallingBlock()) {
+                    result += getMiningDurationTicks(context, x, y + 1, z, true);
+                }
+            }
             if (context.goal != null && context.goal.isInGoal(x, y, z)) {
                 result = Math.min(result, 20);
             }
@@ -576,22 +592,21 @@ public final class MovementHelper {
      * @param b   the blockstate to mine
      */
     public static void switchToBestToolFor(Block b) {
-        switchToBestToolFor(b, new ToolSet(), false); // BaritoneAPI.getSettings().preferSilkTouch.value);
+        switchToBestToolFor(b, new ToolSet(), CONFIG.client.extra.pathfinder.preferSilkTouch);
     }
 
     /**
      * AutoTool for a specific block with precomputed ToolSet data
      */
     public static void switchToBestToolFor(Block b, ToolSet ts, boolean preferSilkTouch) {
-//        if (Baritone.settings().autoTool.value && !Baritone.settings().assumeExternalAutoTool.value) {
-//            ctx.player().getInventory().selected = ts.getBestSlot(b.getBlock(), preferSilkTouch);
-//        }
-        int hotbarSlotId = ts.getBestSlot(b, preferSilkTouch);
-        INVENTORY.submit(InventoryActionRequest.builder()
-            .owner(BARITONE)
-            .actions(new SetHeldItem(hotbarSlotId))
-            .priority(Baritone.getPriority())
-            .build());
+        if (CONFIG.client.extra.pathfinder.autoTool && !CONFIG.client.extra.pathfinder.assumeExternalAutoTool) {
+            int hotbarSlotId = ts.getBestSlot(b, preferSilkTouch);
+            INVENTORY.submit(InventoryActionRequest.builder()
+                .owner(BARITONE)
+                .actions(new SetHeldItem(hotbarSlotId))
+                .priority(Baritone.getPriority())
+                .build());
+        }
     }
 
     public static void moveTowards(MovementState state, BlockPos pos) {
@@ -760,7 +775,7 @@ public final class MovementHelper {
         if (block == BlockRegistry.BAMBOO
             || block == BlockRegistry.MOVING_PISTON
             || block == BlockRegistry.SCAFFOLDING
-            || block.name().endsWith("shulker_box")
+            || block.blockTags().contains(BlockTags.SHULKER_BOXES)
             || block == BlockRegistry.POINTED_DRIPSTONE
             || (block.name().contains("amethyst") && block != BlockRegistry.AMETHYST_BLOCK)
         ) {

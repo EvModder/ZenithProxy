@@ -104,9 +104,10 @@ public class AutoTotem extends AbstractInventoryModule {
             delay--;
             return;
         }
-        if (CACHE.getPlayerCache().getThePlayer().isAlive()
-                && playerHealthBelowThreshold()
-                && Proxy.getInstance().getOnlineTimeSeconds() > 2) {
+        if (CACHE.getPlayerCache().getThePlayer().isAlive() && playerHealthBelowThreshold()) {
+            // todo: submit a no action inv request if we are holding and think we could pop next tick?
+            //  we are ok if the other modules don't mess with offhand
+            //  and don't want to block main hand actions unnecessarily
             delay = doInventoryActions();
         }
         if (CONFIG.client.extra.autoTotem.noTotemsAlert

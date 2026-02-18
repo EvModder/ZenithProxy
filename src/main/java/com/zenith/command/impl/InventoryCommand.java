@@ -444,11 +444,9 @@ public class InventoryCommand extends Command {
             var itemData = ItemRegistry.REGISTRY.get(itemStack.getId());
             sb.append("  ").append(i).append(" -> ");
             sb.append(itemData.name());
-            if (itemStack.getDataComponents() != null) {
-                var nameComponent = itemStack.getDataComponents().get(DataComponentTypes.CUSTOM_NAME);
-                if (nameComponent != null) {
-                    sb.append(" \"").append(ComponentSerializer.serializePlain(nameComponent)).append("\"");
-                }
+            var nameComponent = itemStack.getDataComponentsOrEmpty().get(DataComponentTypes.CUSTOM_NAME);
+            if (nameComponent != null) {
+                sb.append(" \"").append(ComponentSerializer.serializePlain(nameComponent)).append("\"");
             }
             if (itemStack.getAmount() > 1) sb.append(" (x").append(itemStack.getAmount()).append(")");
             if (i == heldSlot) sb.append(" [Held]");
@@ -459,11 +457,9 @@ public class InventoryCommand extends Command {
             sb.append("  mouse -> ");
             var itemData = ItemRegistry.REGISTRY.get(mouseStack.getId());
             sb.append(itemData.name());
-            if (mouseStack.getDataComponents() != null) {
-                var nameComponent = mouseStack.getDataComponents().get(DataComponentTypes.CUSTOM_NAME);
-                if (nameComponent != null) {
-                    sb.append(" \"").append(ComponentSerializer.serializePlain(nameComponent)).append("\"");
-                }
+            var nameComponent = mouseStack.getDataComponentsOrEmpty().get(DataComponentTypes.CUSTOM_NAME);
+            if (nameComponent != null) {
+                sb.append(" \"").append(ComponentSerializer.serializePlain(nameComponent)).append("\"");
             }
             if (mouseStack.getAmount() > 1) sb.append(" (x").append(mouseStack.getAmount()).append(")");
             sb.append("\n");
@@ -508,26 +504,12 @@ public class InventoryCommand extends Command {
     }
 
     private boolean verifyAbleToDoInvActions(final Embed embed) {
-        boolean ok = verifyLoggedIn(embed)
-            && verifyNoActivePlayer(embed);
-        if (ok) return true;
+        if (Proxy.getInstance().isConnected() && !Proxy.getInstance().hasActivePlayer()) return true;
         embed
             .title("Error")
             .description("Unable to perform inventory actions while not logged in or while a player is controlling")
             .errorColor();
         return false;
-    }
-
-    private boolean verifyNoActivePlayer(final Embed embed) {
-        var client = Proxy.getInstance().getClient();
-        if (client == null || !Proxy.getInstance().isConnected()) {
-            embed
-                .title("Error")
-                .description("Not logged in!")
-                .errorColor();
-            return false;
-        }
-        return true;
     }
 
     private boolean verifyLoggedIn(final Embed embed) {

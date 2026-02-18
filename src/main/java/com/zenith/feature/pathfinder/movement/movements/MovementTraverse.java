@@ -132,14 +132,14 @@ public class MovementTraverse extends Movement {
                     }
                 }
                 // now that we've checked all possible directions to side place, we actually need to backplace
-                if (srcDownBlock == BlockRegistry.SOUL_SAND || (srcDownBlock.name().endsWith("_slab") && !BlockStateInterface.isDoubleSlab(srcDown))) {
+                if (srcDownBlock == BlockRegistry.SOUL_SAND || (srcDownBlock.blockTags().contains(BlockTags.SLABS) && !BlockStateInterface.isDoubleSlab(srcDown))) {
                     return COST_INF; // can't sneak and backplace against soul sand or half slabs (regardless of whether it's top half or bottom half) =/
                 }
                 if (!standingOnABlock) { // standing on water / swimming
                     return COST_INF; // this is obviously impossible
                 }
                 Block blockSrc = context.getBlock(x, y, z);
-                if ((blockSrc == BlockRegistry.LILY_PAD || blockSrc.name().endsWith("_carpet")) && World.isFluid(srcDownBlock)) {
+                if ((blockSrc == BlockRegistry.LILY_PAD || blockSrc.blockTags().contains(BlockTags.WOOL_CARPETS)) && World.isFluid(srcDownBlock)) {
                     return COST_INF; // we can stand on these but can't place against them
                 }
                 WC = WC * (SNEAK_ONE_BLOCK_COST / WALK_ONE_BLOCK_COST);//since we are sneak backplacing, we are sneaking lol
@@ -204,24 +204,27 @@ public class MovementTraverse extends Movement {
         Block fd = BlockStateInterface.getBlock(src.below());
         boolean ladder = fd.blockTags().contains(BlockTags.CLIMBABLE);
 
-        if (pb0Block.name().endsWith("_door") || pb1Block.name().endsWith("_door")) {
-            boolean notPassable = pb0Block.name().endsWith("_door") && !MovementHelper.isDoorPassable(src, dest) || pb1Block.name().endsWith("_door") && !MovementHelper.isDoorPassable(dest, src);
+        if (pb0Block.blockTags().contains(BlockTags.DOORS) || pb1Block.blockTags().contains(BlockTags.DOORS)) {
+            boolean notPassable = pb0Block.blockTags().contains(BlockTags.DOORS) && !MovementHelper.isDoorPassable(src, dest) || pb1Block.blockTags().contains(BlockTags.DOORS) && !MovementHelper.isDoorPassable(dest, src);
             boolean canOpen = !(BlockRegistry.IRON_DOOR.equals(pb0Block) || BlockRegistry.IRON_DOOR.equals(pb1Block));
 
             if (notPassable && canOpen) {
                 return state.setTarget(new MovementState.MovementTarget(RotationUtils.calcRotationFromVec3d(ctx.playerHead(), VecUtils.calculateBlockCenter(positionsToBreak[0]), ctx.playerRotations()), true))
-                    .setInput(PathInput.RIGHT_CLICK_BLOCK, true);
+                    .setInput(PathInput.RIGHT_CLICK_BLOCK, true)
+                    .setClickTarget(positionsToBreak[0]);
             }
         }
 
-        if (pb0Block.name().endsWith("fence_gate") || pb1Block.name().endsWith("fence_gate")) {
+        if (pb0Block.blockTags().contains(BlockTags.FENCE_GATES) || pb1Block.blockTags().contains(BlockTags.FENCE_GATES)) {
             BlockPos blocked = !MovementHelper.isGatePassable(positionsToBreak[0], src.above()) ? positionsToBreak[0]
                 : !MovementHelper.isGatePassable(positionsToBreak[1], src) ? positionsToBreak[1]
                 : null;
             if (blocked != null) {
                 Optional<Rotation> rotation = RotationUtils.reachable(ctx, blocked);
                 if (rotation.isPresent()) {
-                    return state.setTarget(new MovementState.MovementTarget(rotation.get(), true)).setInput(PathInput.RIGHT_CLICK_BLOCK, true);
+                    return state.setTarget(new MovementState.MovementTarget(rotation.get(), true))
+                        .setInput(PathInput.RIGHT_CLICK_BLOCK, true)
+                        .setClickTarget(blocked);
                 }
             }
         }
@@ -272,7 +275,7 @@ public class MovementTraverse extends Movement {
         } else {
             wasTheBridgeBlockAlwaysThere = false;
             Block standingOn = BlockStateInterface.getBlock(feet.below());
-            if (standingOn == BlockRegistry.SOUL_SAND || standingOn.name().endsWith("_slab")) { // see issue #118
+            if (standingOn == BlockRegistry.SOUL_SAND || standingOn.blockTags().contains(BlockTags.SLABS)) { // see issue #118
                 double dist = Math.max(Math.abs(dest.x() + 0.5 - ctx.player().getX()), Math.abs(dest.z() + 0.5 - ctx.player().getZ()));
                 if (dist < 0.85) { // 0.5 + 0.3 + epsilon
                     MovementHelper.moveTowards(state, dest);
@@ -287,28 +290,31 @@ public class MovementTraverse extends Movement {
             }
             PATH_LOG.debug("PlaceResult: {}", p);
             switch (p) {
-                case READY_TO_PLACE: {
+                case READY_TO_PLACE -> {
                     if (ctx.player().isSneaking()) {
+                        state.setClickTarget(ctx.getSelectedBlock().orElse(null));
                         state.setInput(PathInput.RIGHT_CLICK_BLOCK, true);
                     }
                     return state;
                 }
-                case ATTEMPTING: {
+                case ATTEMPTING -> {
                     if (dist1 > 0.83) {
                         // might need to go forward a bit
-                        float yaw = RotationUtils.calcRotationFromVec3d(ctx.playerHead(), VecUtils.getBlockPosCenter(dest), ctx.playerRotations()).yaw();
+                        float yaw = RotationUtils.calcRotationFromVec3d(ctx.playerHead(),
+                            VecUtils.getBlockPosCenter(dest),
+                            ctx.playerRotations()).yaw();
                         if (Math.abs(state.getTarget().rotation().yaw() - yaw) < 0.1) {
                             // but only if our attempted place is straight ahead
                             return state.setInput(PathInput.MOVE_FORWARD, true);
                         }
                     } else if (ctx.playerRotations().isReallyCloseTo(state.getTarget().rotation())) {
                         // well i guess theres something in the way
+                        // todo: set input click target?
                         return state.setInput(PathInput.LEFT_CLICK_BLOCK, true);
                     }
                     return state;
                 }
-                default:
-                    break;
+                default -> {}
             }
             if (feet.equals(dest)) {
                 // If we are in the block that we are trying to get to, we are sneaking over air and we need to place a block beneath us against the one we just walked off of
@@ -330,10 +336,12 @@ public class MovementTraverse extends Movement {
                     state.setTarget(new MovementState.MovementTarget(backToFace, true));
                 }
                 if (ctx.isLookingAt(goalLook)) {
+                    state.setClickTarget(goalLook);
                     return state.setInput(PathInput.RIGHT_CLICK_BLOCK, true); // wait to right click until we are able to place
                 }
                 // Out.log("Trying to look at " + goalLook + ", actually looking at" + Baritone.whatAreYouLookingAt());
                 if (ctx.playerRotations().isReallyCloseTo(state.getTarget().rotation())) {
+                    // todo: set click target?
                     state.setInput(PathInput.LEFT_CLICK_BLOCK, true);
                 }
                 return state;

@@ -5,6 +5,7 @@ import com.google.common.collect.Lists;
 import com.zenith.Proxy;
 import com.zenith.cache.data.entity.EntityLiving;
 import com.zenith.cache.data.entity.EntityPlayer;
+import com.zenith.cache.data.inventory.Container;
 import com.zenith.event.client.ClientBotTick;
 import com.zenith.event.client.ClientTickEvent;
 import com.zenith.feature.spectator.SpectatorSync;
@@ -14,6 +15,7 @@ import com.zenith.mc.dimension.DimensionRegistry;
 import com.zenith.mc.entity.EntityData;
 import com.zenith.mc.entity.EntityDimensions;
 import com.zenith.mc.entity.EntityRegistry;
+import com.zenith.mc.item.ItemRegistry;
 import com.zenith.module.api.ModuleUtils;
 import com.zenith.util.math.MathHelper;
 import com.zenith.util.math.MutableVec3d;
@@ -23,10 +25,12 @@ import it.unimi.dsi.fastutil.doubles.DoubleSet;
 import lombok.Getter;
 import org.geysermc.mcprotocollib.protocol.data.game.PlayerListEntry;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.Effect;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.EquipmentSlot;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.attribute.Attribute;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.attribute.AttributeModifier;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.attribute.AttributeType;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.attribute.ModifierOperation;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.MetadataTypes;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.Pose;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.type.ByteEntityMetadata;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.GameMode;
@@ -34,6 +38,7 @@ import org.geysermc.mcprotocollib.protocol.data.game.entity.player.Hand;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.PlayerState;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.PositionElement;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType;
+import org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponentTypes;
 import org.geysermc.mcprotocollib.protocol.data.game.scoreboard.CollisionRule;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.level.ClientboundExplodePacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.ServerboundClientTickEndPacket;
@@ -45,6 +50,7 @@ import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.concurrent.TimeUnit;
 
 import static com.github.rfresh2.EventConsumer.of;
@@ -79,15 +85,16 @@ public final class Bot extends ModuleUtils {
     );
     @Getter private boolean isSneaking;
     private boolean wasSneaking;
-    private boolean isSprinting;
+    @Getter private boolean isSprinting;
     private boolean lastSprinting;
     private boolean isFlying;
-    private boolean isFallFlying;
-    private boolean isSwimming;
-    private boolean isGliding;
+    @Getter private boolean isFallFlying;
+    @Getter private boolean isSwimming;
     private double fallDistance;
     @Getter private boolean isTouchingWater;
     @Getter private boolean isTouchingLava;
+    private boolean wasJumpPressed = false;
+    private boolean wasSneakPressed = false;
     private double waterHeight;
     private double lavaHeight;
     private int ticksSinceLastPositionPacketSent;
@@ -108,7 +115,7 @@ public final class Bot extends ModuleUtils {
     private float flyingSpeed = 0.05f;
     private boolean onGroundNoBlocks = false;
     @Getter Optional<BlockPos> supportingBlockPos = Optional.empty();
-    private int jumpingCooldown;
+    private int jumpTriggerTime;
     @Getter private boolean horizontalCollision = false;
     private boolean horizontalCollisionMinor = false;
     @Getter private boolean verticalCollision = false;
@@ -199,7 +206,6 @@ public final class Bot extends ModuleUtils {
                     int blockY = raycast.block().y();
                     int blockZ = raycast.block().z();
                     if (!wasLeftClicking && !interactions.isDestroying()) {
-                        debug("Starting destroy block at: [{}, {}, {}]", blockX, blockY, blockZ);
                         interactions.startDestroyBlock(
                             MathHelper.floorI(blockX),
                             MathHelper.floorI(blockY),
@@ -267,7 +273,7 @@ public final class Bot extends ModuleUtils {
     }
 
     private void tick(final ClientBotTick event) {
-        if (this.jumpingCooldown > 0) --this.jumpingCooldown;
+        if (this.jumpTriggerTime > 0) --this.jumpTriggerTime;
         if (!CACHE.getChunkCache().isChunkLoaded((int) x >> 4, (int) z >> 4)) return;
 
         if (resyncTeleport()) return;
@@ -302,41 +308,46 @@ public final class Bot extends ModuleUtils {
             velocity.set(0, 0, 0);
         }
 
-        var fallFlyingMetadata = CACHE.getPlayerCache().getThePlayer().getMetadata().get(0);
-        if (fallFlyingMetadata instanceof ByteEntityMetadata byteEntityMetadata) {
-            var b = byteEntityMetadata.getPrimitiveValue();
-            isFallFlying = (b & 0x80) != 0;
-        } else {
-            isFallFlying = false;
-        }
+        updateFallFlying();
 
         isSneaking = !isFlying
             && !CACHE.getPlayerCache().getThePlayer().isInVehicle()
             && canPlayerFitWithinBlocksAndEntitiesWhen(getCollisionBox(Pose.SNEAKING))
             && (movementInput.sneaking || !CACHE.getPlayerCache().getThePlayer().isSleeping() && !canPlayerFitWithinBlocksAndEntitiesWhen(getCollisionBox(Pose.STANDING)));
         isSprinting = movementInput.sprinting
-            && isOnGround()
+            && (lastSprinting || isOnGround())
+            && (lastSprinting || !CACHE.getPlayerCache().getThePlayer().getPotionEffectMap().containsKey(Effect.BLINDNESS))
             && !isTouchingWater
             && CACHE.getPlayerCache().getThePlayer().getFood() > 6
             && !(horizontalCollision && !horizontalCollisionMinor);
-        // cannot start sprinting while we have blindness
-        if (isSprinting && !lastSprinting && CACHE.getPlayerCache().getThePlayer().getPotionEffectMap().containsKey(Effect.BLINDNESS)) {
-            isSprinting = false;
-        }
         if (isSprinting != lastSprinting) applySprintingSpeedAttributeModifier();
 
         updateInWaterStateAndDoFluidPushing();
         updateSwimming();
-        if (CACHE.getPlayerCache().isCanFly()) {
+        boolean didUpdateFlyState = false;
+        if (CACHE.getPlayerCache().isCanFly()) { // creative flight
             if (CACHE.getPlayerCache().getGameMode() == GameMode.SPECTATOR) {
                 if (!CACHE.getPlayerCache().isFlying()) {
                     CACHE.getPlayerCache().setFlying(true);
+                    didUpdateFlyState = true;
                     onUpdateAbilities();
                 }
-            } else if (movementInput.isJumping()) {
-                // todo:
-                // need to check prev jump state, but lets just not do that for now
+            } else if (!wasJumpPressed && movementInput.isJumping()) { // && !isAutoJump
+                if (jumpTriggerTime == 0) {
+                    jumpTriggerTime = 7;
+                } else if (!isSwimming()) {
+                    CACHE.getPlayerCache().setFlying(!CACHE.getPlayerCache().isFlying());
+                    if (CACHE.getPlayerCache().isFlying() && isOnGround()) {
+                        jump();
+                    }
+                    didUpdateFlyState = true;
+                    onUpdateAbilities();
+                    jumpTriggerTime = 0;
+                }
             }
+        }
+        if (movementInput.jumping && !didUpdateFlyState && !wasJumpPressed && !onClimbable() && tryToStartFallFlying()) {
+            sendClientPacketAsync(new ServerboundPlayerCommandPacket(CACHE.getPlayerCache().getEntityId(), PlayerState.START_ELYTRA_FLYING));
         }
         if (isFlying) {
             int verticalDirection = 0;
@@ -358,15 +369,15 @@ public final class Bot extends ModuleUtils {
         }
 
         if (movementInput.isJumping()) {
-            if (this.onGround && jumpingCooldown == 0 && (!isTouchingWater && !isTouchingLava)) {
+            if (this.onGround && jumpTriggerTime == 0 && (!isTouchingWater && !isTouchingLava)) {
                 jump();
-                jumpingCooldown = 10;
+                jumpTriggerTime = 10;
             } else if (isTouchingWater || isTouchingLava) {
                 this.velocity.setY(this.velocity.getY() + 0.04F);
             }
             // todo: lava swimming
             // todo: full jump when at water surface
-        } else jumpingCooldown = 0;
+        } else jumpTriggerTime = 0;
 
         final MutableVec3d movementInputVec = getMovementInputVec();
         if (isTouchingWater && isSneaking && !isFlying) velocity.setY(velocity.getY() - 0.04f);
@@ -465,7 +476,46 @@ public final class Bot extends ModuleUtils {
         if (currentPose != pose) {
             SpectatorSync.sendPlayerPose();
         }
+        tickEntities();
+        this.wasJumpPressed = movementInput.jumping;
+        this.wasSneakPressed = movementInput.sneaking;
         this.movementInput.reset();
+    }
+
+    void postTick(ClientBotTick event) {
+        this.inputRequestFuture.notifyListeners();
+        this.inputRequestFuture = InputRequestFuture.rejected;
+        sendClientPacket(ServerboundClientTickEndPacket.INSTANCE);
+    }
+
+    private void tickEntities() {
+        for (var entity : CACHE.getEntityCache().getEntities().values()) {
+            if (entity == CACHE.getPlayerCache().getThePlayer()) continue;
+            switch (entity.getEntityType()) {
+                case FIREWORK_ROCKET -> {
+                    var attachedEntityId = entity.getMetadataValue(9, MetadataTypes.OPTIONAL_VARINT, OptionalInt.class);
+                    if (attachedEntityId == null) continue;
+                    if (attachedEntityId.getAsInt() != CACHE.getPlayerCache().getEntityId()) continue;
+                    if (!isFallFlying) continue;
+                    var lookVector = MathHelper.calculateViewVector(yaw, pitch);
+                    velocity.add(
+                        lookVector.getX() * 0.1 + (lookVector.getX() * 1.5 - this.velocity.getX()) * 0.5,
+                        lookVector.getY() * 0.1 + (lookVector.getY() * 1.5 - velocity.getY()) * 0.5,
+                        lookVector.getZ() * 0.1 + (lookVector.getZ() * 1.5 - this.velocity.getZ()) * 0.5
+                    );
+                }
+            }
+        }
+    }
+
+    private void updateFallFlying() {
+        var fallFlyingMetadata = CACHE.getPlayerCache().getThePlayer().getMetadata().get(0);
+        if (fallFlyingMetadata instanceof ByteEntityMetadata byteEntityMetadata) {
+            var b = byteEntityMetadata.getPrimitiveValue();
+            isFallFlying = (b & 0x80) != 0;
+        } else {
+            isFallFlying = false;
+        }
     }
 
     // returns true if a container is open
@@ -496,12 +546,6 @@ public final class Bot extends ModuleUtils {
             }
         }
         return isContainerOpen;
-    }
-
-    private void postTick(ClientBotTick event) {
-        this.inputRequestFuture.notifyListeners();
-        this.inputRequestFuture = InputRequestFuture.rejected;
-        sendClientPacket(ServerboundClientTickEndPacket.INSTANCE);
     }
 
     public CollisionBox getCollisionBox(Pose pose) {
@@ -730,7 +774,7 @@ public final class Bot extends ModuleUtils {
         move();
     }
 
-    private void    travelInAir(MutableVec3d movementInputVec) {
+    private void travelInAir(MutableVec3d movementInputVec) {
         final Block floorBlock = World.getBlock(getVelocityAffectingPos());
         float floorSlipperiness = floorBlock.friction();
         float friction = this.onGround ? floorSlipperiness * 0.91f : 0.91F;
@@ -1221,7 +1265,7 @@ public final class Bot extends ModuleUtils {
     }
 
     private float getBlockSpeedFactor() {
-        if (this.isGliding || this.isFlying) return 1.0f;
+        if (this.isFallFlying || this.isFlying) return 1.0f;
         Block inBlock = World.getBlock(MathHelper.floorI(x), MathHelper.floorI(y), MathHelper.floorI(z));
         float inBlockSpeedFactor = inBlock.speedFactor();
         if (inBlockSpeedFactor != 1.0f || World.isWater(inBlock)) return inBlockSpeedFactor;
@@ -1259,6 +1303,8 @@ public final class Bot extends ModuleUtils {
         this.pitch = this.lastPitch = this.requestedPitch = CACHE.getPlayerCache().getPitch();
         this.onGround = this.lastOnGround = true; // todo: cache
         this.isFlying = CACHE.getPlayerCache().isFlying();
+        this.wasJumpPressed = false;
+        this.wasSneakPressed = false;
         this.velocity.set(0, 0, 0);
         this.supportingBlockPos = Optional.empty();
         this.onGroundNoBlocks = false;
@@ -1271,6 +1317,7 @@ public final class Bot extends ModuleUtils {
             this.isSprinting = this.lastSprinting = CACHE.getPlayerCache().isSprinting();
         }
         this.isSwimming = CACHE.getPlayerCache().getThePlayer().isSwimming();
+        updateFallFlying();
         rideTick();
         syncPlayerCollisionBox();
         updateAttributes();
@@ -1371,7 +1418,7 @@ public final class Bot extends ModuleUtils {
         var inBlock = World.getBlock(MathHelper.floorI(x), MathHelper.floorI(y), MathHelper.floorI(z));
         if (inBlock.blockTags().contains(BlockTags.CLIMBABLE)) {
             return true;
-        } else if (inBlock.name().endsWith("_trapdoor")) {
+        } else if (inBlock.blockTags().contains(BlockTags.TRAPDOORS)) {
             int blockStateId = World.getBlockStateId(MathHelper.floorI(x), MathHelper.floorI(y), MathHelper.floorI(z));
             var openProperty = World.getBlockStateProperty(blockStateId, BlockStateProperties.OPEN);
             if (openProperty != null && openProperty) {
@@ -1560,6 +1607,63 @@ public final class Bot extends ModuleUtils {
             }
             this.pose = pose2;
         }
+    }
+
+    boolean tryToStartFallFlying() {
+        if (!this.isFallFlying() && this.canGlide() && !this.isTouchingWater()) {
+            this.startFallFlying();
+            return true;
+        } else {
+            return false;
+        }
+    }
+
+    void startFallFlying() {
+        var metadata0 = CACHE.getPlayerCache().getThePlayer().getMetadata().get(0);
+        if (metadata0 instanceof ByteEntityMetadata bmd0) {
+            var b = bmd0.getPrimitiveValue();
+            bmd0.setValue((byte) (b | 0x80));
+        } else {
+            var md = new ByteEntityMetadata(0, MetadataTypes.BYTE, (byte) 0x80);
+            CACHE.getPlayerCache().getThePlayer().getMetadata().put(0, md);
+        }
+        updateFallFlying();
+    }
+
+    void stopFallFlying() {
+        var metadata0 = CACHE.getPlayerCache().getThePlayer().getMetadata().get(0);
+        if (metadata0 instanceof ByteEntityMetadata bmd0) {
+            var b = bmd0.getPrimitiveValue();
+            bmd0.setValue((byte) (b & ~(0x80)));
+        }
+        updateFallFlying();
+    }
+
+    boolean canGlide() {
+        if (isFlying) return false;
+        if (!onGround && !CACHE.getPlayerCache().getThePlayer().isInVehicle() && CACHE.getPlayerCache().getThePlayer().getPotionEffectMap().get(Effect.LEVITATION) == null) {
+            var chestItemStack = CACHE.getPlayerCache().getEquipment(EquipmentSlot.CHESTPLATE);
+            if (chestItemStack == Container.EMPTY_STACK) return false;
+            var itemData = ItemRegistry.REGISTRY.get(chestItemStack.getId());
+            if (itemData == null) return false;
+            if (itemData != ItemRegistry.ELYTRA) return false;
+            var components = chestItemStack.getDataComponentsOrEmpty();
+            var damageComponent = components.get(DataComponentTypes.DAMAGE);
+            if (damageComponent == null) return true;
+            var maxDamage = itemData.components().get(DataComponentTypes.MAX_DAMAGE);
+            if (maxDamage == null) return true;
+            return damageComponent < maxDamage;
+        }
+        return false;
+    }
+
+    public void absMoveTo(double x, double y, double z) {
+        double d = MathHelper.clamp(x, -3.0E7, 3.0E7);
+        double e = MathHelper.clamp(z, -3.0E7, 3.0E7);
+        this.x = d;
+        this.y = y;
+        this.z = e;
+        syncPlayerCollisionBox();
     }
 
     public double getBlockReachDistance() {

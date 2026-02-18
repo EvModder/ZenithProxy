@@ -79,12 +79,13 @@ public class PlayerCache implements CachedData {
     protected boolean isSprinting = false;
     protected EntityEvent opLevel = EntityEvent.PLAYER_OP_PERMISSION_LEVEL_0;
     protected AtomicInteger actionId = new AtomicInteger(0);
-    protected AtomicInteger seqId = new AtomicInteger(0);
     private static final MutableVec3i DEFAULT_SPAWN_POSITION = new MutableVec3i(0, 0, 0);
     protected MutableVec3i spawnPosition = DEFAULT_SPAWN_POSITION;
     protected Queue<ClientboundPlayerPositionPacket> teleportQueue = new LinkedBlockingQueue<>();
     protected Queue<KeepAliveRequest> keepAliveQueue = new LinkedBlockingQueue<>();
+    protected Queue<PingRequest> pingQueue = new LinkedBlockingQueue<>();
     protected boolean respawning = false;
+    protected boolean clientLoaded = false;
 
     public PlayerCache(final EntityCache entityCache) {
         this.entityCache = entityCache;
@@ -129,8 +130,8 @@ public class PlayerCache implements CachedData {
             this.doLimitedCrafting = false;
             this.teleportQueue.clear();
             this.keepAliveQueue.clear();
+            this.pingQueue.clear();
             this.actionId.set(0);
-            this.seqId.set(0);
         }
         if (type == CacheResetType.LOGIN) {
             this.teleportQueue.clear();
@@ -144,6 +145,7 @@ public class PlayerCache implements CachedData {
         this.isSneaking = this.isSprinting = false;
         this.heldItemSlot = 0;
         this.respawning = false;
+        this.clientLoaded = false;
     }
 
     @Override
@@ -329,4 +331,5 @@ public class PlayerCache implements CachedData {
     }
 
     public record KeepAliveRequest(long receivedTime, long id) {}
+    public record PingRequest(long receivedTime, int id) {}
 }

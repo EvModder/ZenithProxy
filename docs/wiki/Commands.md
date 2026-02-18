@@ -479,6 +479,8 @@ Debug settings for features in testing or for use in development.
 
   ```debug uploadDebugLog```
 
+  ```debug uploadLauncherLog```
+
   ```debug passthroughResourcePacks on/off```
 
 
@@ -732,6 +734,8 @@ The `timeout` arguments configures how long until players are kicked due no pack
   ```serverConnection updateServerIcon on/off```
 
   ```serverConnection chatSigning mode <disguised/passthrough/system>```
+
+  ```serverConnection preferLoginAsController on/off```
 
 
 ### shutdown
@@ -1429,11 +1433,11 @@ Dropping can be configured based on modes:
 
 
 
-    * `all`: any item
+* `all`: any item
 
-    * `whitelist`: only added items
+* `whitelist`: only added items
 
-    * `blacklist`: any item not added
+* `blacklist`: any item not added
 
 **Usage**
 
@@ -2220,7 +2224,7 @@ Schedules commands to be executed after a delay or after specified events.
 
 Examples:
 
-`tasks add timed 15m pearlLoader load rfresh`
+`tasks add timed loadMyPearl 15m pearlLoader load rfresh`
 
 `tasks add interval mapgen 30s 1h map generate`
 

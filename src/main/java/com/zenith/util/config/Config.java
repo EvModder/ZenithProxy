@@ -6,18 +6,17 @@ import com.zenith.feature.chatschema.ChatSchema;
 import com.zenith.feature.tasks.Task;
 import com.zenith.feature.waypoints.Waypoint;
 import com.zenith.feature.whitelist.PlayerEntry;
+import com.zenith.mc.item.ItemRegistry;
 import com.zenith.module.impl.ActiveHours.ActiveTime;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
+import it.unimi.dsi.fastutil.objects.ObjectArraySet;
 import lombok.Getter;
 import org.geysermc.mcprotocollib.network.ProxyInfo;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
+import java.util.*;
 
 @NullMarked
 public final class Config {
@@ -123,6 +122,7 @@ public final class Config {
 
         public static final class Ping {
             public int pingIntervalSeconds = 5;
+            public int pingQueueTimeoutMs = 2000;
         }
 
         public static final class Extra {
@@ -203,7 +203,9 @@ public final class Config {
                 public boolean allowDiagonalAscend = false;
                 public boolean diagonalCentering = false;
                 public boolean traverseCentering = false;
+                public double blockPlacementPenalty = 20.0;
                 public double blockBreakAdditionalCost = 2;
+                public double jumpPenalty = 2.0;
                 public int maxFallHeightNoWater = 3;
                 public boolean allowLongFall = false;
                 public double longFallCostLogMultiplier = 50;
@@ -223,6 +225,30 @@ public final class Config {
                 public boolean simplifyUnloadedYGoal = false;
                 public boolean placeBlockVerifyAbleToPlace = true;
                 public int interactWithProcessMaxPathTries = 5;
+                public boolean avoidUpdatingFallingBlocks = true;
+                public boolean pauseMiningForFallingBlocks = true;
+                public boolean autoTool = true;
+                public boolean assumeExternalAutoTool = false;
+                public boolean itemSaver = false;
+                public int itemSaverThreshold = 5;
+                public boolean preferSilkTouch = false;
+                public final Set<String> acceptableThrowawayItems = new ObjectArraySet<>(new String[]{
+                    ItemRegistry.DIRT.name(),
+                    ItemRegistry.COBBLESTONE.name(),
+                    ItemRegistry.NETHERRACK.name(),
+                    ItemRegistry.STONE.name(),
+                    ItemRegistry.OBSIDIAN.name(),
+                    ItemRegistry.CRYING_OBSIDIAN.name(),
+                    ItemRegistry.BIRCH_PLANKS.name(),
+                    ItemRegistry.JUNGLE_PLANKS.name(),
+                    ItemRegistry.SPRUCE_PLANKS.name(),
+                    ItemRegistry.DARK_OAK_PLANKS.name(),
+                    ItemRegistry.ACACIA_PLANKS.name(),
+                    ItemRegistry.WARPED_PLANKS.name(),
+                    ItemRegistry.CHERRY_PLANKS.name(),
+                    ItemRegistry.OAK_PLANKS.name()
+                });
+                public final Set<String> allowBreakAnyway = new ObjectArraySet<>();
             }
 
             public static class SessionTimeLimit {
@@ -658,6 +684,7 @@ public final class Config {
         public boolean inputManagerDebugLogs = false;
         public boolean botPitchPrecisionClamping = true;
         public boolean botRotateBeforeInteract = true;
+        public boolean inventoryRequestServerSyncOnAction = false;
 
         public static final class PacketLog {
             public boolean enabled = false;
@@ -715,6 +742,7 @@ public final class Config {
         public boolean injectTablistFooter = true;
         public boolean welcomeMessages = true;
         public boolean updateServerIcon = true;
+        public boolean preferLoginAsController = true;
         public final ChatSigning chatSigning = new ChatSigning();
 
         public static final class ChatSigning {
@@ -743,7 +771,7 @@ public final class Config {
             public boolean allowSpectator = true;
             public String spectatorEntity = "cat";
             public boolean spectatorPublicChatEnabled = true;
-            public boolean fullCommandsEnabled = false;
+            public boolean fullCommandsEnabled = true;
             public boolean fullCommandsAcceptSlashCommands = true;
             public boolean fullCommandsRequireRegularWhitelist = true;
             public boolean playerCamOnJoin = false;
@@ -809,9 +837,9 @@ public final class Config {
         }
 
         public String getProxyAddress() {
-            // if the proxy IP is not a DNS name, also return the port appended
-            if (!this.proxyIP.contains(":") // port already appended
-                && (this.proxyIP.contains("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+") || this.proxyIP.startsWith("localhost"))) // IP address
+            // if the proxy IP is not a DNS name and port is not present, append the port
+            if (!this.proxyIP.contains(":")
+                && (this.proxyIP.matches("[0-9]+\\.[0-9]+\\.[0-9]+\\.[0-9]+") || this.proxyIP.startsWith("localhost"))) // IP address
                 return this.proxyIP + ":" + this.bind.port;
              else
                 return this.proxyIP;

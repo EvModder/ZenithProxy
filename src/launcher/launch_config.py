@@ -1,28 +1,29 @@
 import json
 import os
 import re
+from typing import Optional
 
-from utils import critical_error
+from log import info, error, critical_error
 
 
-def version_looks_valid(ver):
+def version_looks_valid(ver: str) -> bool:
     return re.match(r"[0-9]+\.[0-9]+\.[0-9]+", ver) or (len(ver) == 8 and re.match(r"[0-9a-f]+", ver))
 
 
-def valid_release_channel(channel):
+def valid_release_channel(channel: str) -> bool:
     return channel.startswith("git") or channel.startswith("java") or channel.startswith("linux")
 
 
-def read_launch_config_file():
+def read_launch_config_file() -> Optional[dict]:
     try:
         with open("launch_config.json") as f:
             data = json.load(f)
             return data
     except FileNotFoundError:
-        print("launch_config.json not found")
+        info("launch_config.json not found")
         return None
     except json.decoder.JSONDecodeError:
-        print("launch_config.json is invalid")
+        error("launch_config.json is invalid")
         return None
 
 
@@ -51,7 +52,7 @@ class LaunchConfig:
         self.repo_name = data.get("repo_name", self.repo_name)
         self.custom_jvm_args = data.get("custom_jvm_args", self.custom_jvm_args)
         if self.custom_jvm_args is not None and self.custom_jvm_args != "":
-            print("Using custom JVM args:", self.custom_jvm_args)
+            info(f"Using custom JVM args: {self.custom_jvm_args}")
 
     def write_launch_config(self):
         output = {
@@ -70,28 +71,30 @@ class LaunchConfig:
         os.replace("launch_config.json.tmp", "launch_config.json")
 
     def create_default_launch_config(self):
-        print("Creating default launch_config.json")
+        info("Creating default launch_config.json")
         self.write_launch_config()
 
     def validate_launch_config(self):
         if not valid_release_channel(self.release_channel):
-            print("Invalid release channel:", self.release_channel)
+            error(f"Invalid release channel: {self.release_channel}")
             return False
         if not version_looks_valid(self.version):
-            print("Invalid version string:", self.version)
+            error(f"Invalid version string: {self.version}")
             return False
         if self.repo_name == "":
-            print("Invalid repo name:", self.repo_name)
+            error(f"Invalid repo name: {self.repo_name}")
             return False
         if self.repo_owner == "":
-            print("Invalid repo owner:", self.repo_owner)
+            error(f"Invalid repo owner: {self.repo_owner}")
             return False
         return True
 
-    def get_mc_version(self):
+    def get_mc_version(self) -> str:
         # extract mc version from release channel
         # e.g. java.1.20.1 -> 1.20.1 or linux.1.20.1 -> 1.20.1
-        channel = self.release_channel.removesuffix(".pre")
+        channel = self.release_channel
+        if channel.endswith(".pre"):
+            channel = channel[:-4]
         java = channel.startswith("java")
         linux = channel.startswith("linux")
         if channel.find(".") == -1 or (not java and not linux):

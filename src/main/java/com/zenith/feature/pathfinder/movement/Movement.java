@@ -8,15 +8,16 @@ import com.zenith.feature.pathfinder.util.VecUtils;
 import com.zenith.feature.player.Rotation;
 import com.zenith.feature.player.World;
 import com.zenith.mc.block.BlockPos;
+import com.zenith.mc.block.CollisionBox;
 import com.zenith.mc.block.Direction;
 import com.zenith.mc.block.LocalizedCollisionBox;
 import lombok.ToString;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 
-import static com.zenith.Globals.BARITONE;
-import static com.zenith.Globals.BOT;
+import static com.zenith.Globals.*;
 
 @ToString
 public abstract class Movement implements IMovement {
@@ -128,6 +129,8 @@ public abstract class Movement implements IMovement {
         currentState.getInputStates().forEach((input, forced) -> {
             BARITONE.getInputOverrideHandler().setInputForceState(input, forced);
         });
+        BARITONE.getInputOverrideHandler().setClickTarget(currentState.getClickTarget());
+        currentState.setClickTarget(null);
         currentState.getInputStates().clear();
 
         // If the current status indicates a completed movement
@@ -144,9 +147,14 @@ public abstract class Movement implements IMovement {
         }
         boolean somethingInTheWay = false;
         for (BlockPos blockPos : positionsToBreak) {
-//            if (!ctx.world().getEntitiesOfClass(FallingBlockEntity.class, new AABB(0, 0, 0, 1, 1.1, 1).move(blockPos)).isEmpty() && Baritone.settings().pauseMiningForFallingBlocks.value) {
-//                return false;
-//            }
+            if (CONFIG.client.extra.pathfinder.pauseMiningForFallingBlocks) {
+                var fallingEntityCb = new LocalizedCollisionBox(new CollisionBox(0, 1, 0, 1.1, 0, 1), blockPos.x(), blockPos.y(), blockPos.z());
+                var cbResult = new ArrayList<LocalizedCollisionBox>();
+                World.getEntityCollisionBoxes(fallingEntityCb, cbResult, entity -> entity.getEntityType() == EntityType.FALLING_BLOCK);
+                if (!cbResult.isEmpty()) {
+                    return false;
+                }
+            }
             if (!MovementHelper.canWalkThrough(blockPos)) { // can't break air, so don't try
                 somethingInTheWay = true;
                 MovementHelper.switchToBestToolFor(BlockStateInterface.getBlock(blockPos));
@@ -156,6 +164,7 @@ public abstract class Movement implements IMovement {
                     state.setTarget(new MovementState.MovementTarget(rotTowardsBlock, true));
                     if (ctx.isLookingAt(blockPos) || ctx.playerRotations().isReallyCloseTo(rotTowardsBlock)) {
                         state.setInput(PathInput.LEFT_CLICK_BLOCK, true);
+                        state.setClickTarget(blockPos);
                     }
                     return false;
                 }
@@ -169,6 +178,7 @@ public abstract class Movement implements IMovement {
                 );
                 // don't check selectedblock on this one, this is a fallback when we can't see any face directly, it's intended to be breaking the "incorrect" block
                 state.setInput(PathInput.LEFT_CLICK_BLOCK, true);
+                state.setClickTarget(blockPos);
                 return false;
             }
         }

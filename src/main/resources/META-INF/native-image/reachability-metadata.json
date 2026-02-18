@@ -742,6 +742,17 @@
       ]
     },
     {
+      "type": "com.sun.crypto.provider.HKDFKeyDerivation$HKDFSHA256",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "javax.crypto.KDFParameters"
+          ]
+        }
+      ]
+    },
+    {
       "type": "com.sun.crypto.provider.HKDFKeyDerivation$HKDFSHA384",
       "methods": [
         {
@@ -975,6 +986,9 @@
           "parameterTypes": []
         }
       ]
+    },
+    {
+      "type": "com.velocitypowered.natives.compression.VelocityCompressor"
     },
     {
       "type": "com.viaversion.nbt.tag.ByteArrayTag",
@@ -2224,29 +2238,9 @@
             "float",
             "boolean",
             "java.util.EnumSet",
-            "boolean",
             "float",
             "float",
             "float",
-            "boolean",
-            "org.geysermc.mcprotocollib.protocol.data.game.level.block.BlockEntityType"
-          ]
-        },
-        {
-          "name": "<init>",
-          "parameterTypes": [
-            "int",
-            "java.lang.String",
-            "int",
-            "int",
-            "int",
-            "com.zenith.mc.block.BlockOffsetType",
-            "float",
-            "float",
-            "boolean",
-            "float",
-            "boolean",
-            "java.util.EnumSet",
             "boolean",
             "org.geysermc.mcprotocollib.protocol.data.game.level.block.BlockEntityType"
           ]
@@ -2293,6 +2287,51 @@
       ]
     },
     {
+      "type": "com.zenith.mc.item.ItemData",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "int",
+            "java.lang.String",
+            "org.geysermc.mcprotocollib.protocol.data.game.item.component.DataComponents",
+            "java.util.EnumSet",
+            "com.zenith.mc.item.ToolTag"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.mc.item.ItemDataComponentsDeserializer",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.mc.item.ItemTags"
+    },
+    {
+      "type": "com.zenith.mc.item.ToolTag",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "com.zenith.mc.item.ToolTier",
+            "com.zenith.mc.item.ToolType"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.mc.item.ToolTier"
+    },
+    {
+      "type": "com.zenith.mc.item.ToolType"
+    },
+    {
       "type": "com.zenith.module.impl.ActiveHours$ActiveTime",
       "allDeclaredFields": true,
       "methods": [
@@ -2328,6 +2367,34 @@
     },
     {
       "type": "com.zenith.network.server.ServerSession[]"
+    },
+    {
+      "type": "com.zenith.plugin.api.PluginInfo",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "java.lang.String",
+            "java.lang.String",
+            "com.zenith.plugin.api.Version",
+            "java.lang.String",
+            "java.lang.String",
+            "java.util.List",
+            "java.util.List"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.plugin.api.Version",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "java.lang.String"
+          ]
+        }
+      ]
     },
     {
       "type": "com.zenith.terminal.ZenithComponentLoggerProvider"
@@ -4224,6 +4291,30 @@
       ]
     },
     {
+      "type": "it.unimi.dsi.fastutil.Function"
+    },
+    {
+      "type": "it.unimi.dsi.fastutil.ints.AbstractInt2ObjectFunction"
+    },
+    {
+      "type": "it.unimi.dsi.fastutil.ints.AbstractInt2ObjectMap"
+    },
+    {
+      "type": "it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "it.unimi.dsi.fastutil.ints.Int2ObjectFunction"
+    },
+    {
+      "type": "it.unimi.dsi.fastutil.ints.Int2ObjectMap"
+    },
+    {
       "type": "it.unimi.dsi.fastutil.ints.IntArraySet",
       "methods": [
         {
@@ -4325,6 +4416,9 @@
           "parameterTypes": []
         }
       ]
+    },
+    {
+      "type": "java.lang.Cloneable"
     },
     {
       "type": "java.lang.Comparable"
@@ -4763,6 +4857,24 @@
           ]
         },
         {
+          "name": "put",
+          "parameterTypes": [
+            "int",
+            "java.nio.ByteBuffer",
+            "int",
+            "int"
+          ]
+        },
+        {
+          "name": "put",
+          "parameterTypes": [
+            "int",
+            "byte[]",
+            "int",
+            "int"
+          ]
+        },
+        {
           "name": "slice",
           "parameterTypes": [
             "int",
@@ -5076,6 +5188,9 @@
       "type": "java.util.List"
     },
     {
+      "type": "java.util.Map"
+    },
+    {
       "type": "java.util.Optional"
     },
     {
@@ -5183,6 +5298,12 @@
           "name": "value"
         }
       ]
+    },
+    {
+      "type": "java.util.function.Function"
+    },
+    {
+      "type": "java.util.function.IntFunction"
     },
     {
       "type": "java.util.logging.LogManager",
@@ -5421,6 +5542,9 @@
     },
     {
       "type": "javax.smartcardio.CardPermission"
+    },
+    {
+      "type": "jdk.internal.jrtfs.JrtFileSystemProvider"
     },
     {
       "type": "jdk.internal.misc.Unsafe",

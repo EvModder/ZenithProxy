@@ -8,10 +8,7 @@ import com.zenith.network.client.handler.incoming.scoreboard.*;
 import com.zenith.network.client.handler.incoming.spawn.AddEntityHandler;
 import com.zenith.network.client.handler.incoming.spawn.AddExperienceOrbHandler;
 import com.zenith.network.client.handler.incoming.spawn.SpawnPositionHandler;
-import com.zenith.network.client.handler.outgoing.OutgoingCKeepAliveHandler;
-import com.zenith.network.client.handler.outgoing.OutgoingChatCommandSignedHandler;
-import com.zenith.network.client.handler.outgoing.OutgoingChatHandler;
-import com.zenith.network.client.handler.outgoing.OutgoingContainerClickHandler;
+import com.zenith.network.client.handler.outgoing.*;
 import com.zenith.network.client.handler.postoutgoing.*;
 import com.zenith.network.server.ServerSession;
 import com.zenith.network.server.handler.player.incoming.*;
@@ -134,6 +131,7 @@ public final class PacketCodecRegistries {
                 .inbound(ClientboundTransferPacket.class, new CTransferHandler())
                 .inbound(ClientboundKeepAlivePacket.class, CKeepAliveHandler.INSTANCE)
                 .outbound(ServerboundKeepAlivePacket.class, OutgoingCKeepAliveHandler.INSTANCE)
+                .outbound(ServerboundPongPacket.class, OutgoingCPongHandler.INSTANCE)
                 .postOutbound(ServerboundFinishConfigurationPacket.class, new PostOutgoingFinishConfigurationHandler())
                 .build())
             .state(ProtocolState.GAME, PacketHandlerStateCodec.clientBuilder()
@@ -186,6 +184,7 @@ public final class PacketCodecRegistries {
                 .inbound(ClientboundRecipeBookSettingsPacket.class, new RecipeBookSettingsHandler())
                 .inbound(ClientboundUpdateRecipesPacket.class, new UpdateRecipesHandler())
                 .inbound(ClientboundUpdateTagsPacket.class, UpdateTagsHandler.INSTANCE)
+                .inbound(ClientboundBlockChangedAckPacket.class, new BlockChangedAckHandler())
                 .inbound(ClientboundInitializeBorderPacket.class, new WorldBorderInitializeHandler())
                 .inbound(ClientboundBlockEntityDataPacket.class, new BlockEntityDataHandler())
                 .inbound(ClientboundSetTimePacket.class, new SetTimeHandler())
@@ -229,6 +228,8 @@ public final class PacketCodecRegistries {
                 .outbound(ServerboundContainerClickPacket.class, new OutgoingContainerClickHandler())
                 .inbound(ClientboundKeepAlivePacket.class, CKeepAliveHandler.INSTANCE)
                 .outbound(ServerboundKeepAlivePacket.class, OutgoingCKeepAliveHandler.INSTANCE)
+                .outbound(ServerboundPongPacket.class, OutgoingCPongHandler.INSTANCE)
+                .outbound(ServerboundPlayerLoadedPacket.class, new OutgoingPlayerLoadedHandler())
                 .postOutbound(ServerboundAcceptTeleportationPacket.class, new PostOutgoingAcceptTeleportHandler())
                 .postOutbound(ServerboundConfigurationAcknowledgedPacket.class, new PostOutgoingConfigurationAckHandler())
                 .postOutbound(ServerboundMoveVehiclePacket.class, new PostOutgoingMoveVehicleHandler())
@@ -262,6 +263,7 @@ public final class PacketCodecRegistries {
                 .inbound(ServerboundChatPacket.class, new ChatHandler())
                 .inbound(ServerboundCommandSuggestionPacket.class, new CommandSuggestionHandler())
                 .inbound(ServerboundKeepAlivePacket.class, SPlayerKeepAliveHandler.INSTANCE)
+                .inbound(ServerboundSetCarriedItemPacket.class, new SSetCarriedItemHandler())
                 .outbound(ClientboundCommandsPacket.class, new ClientCommandsOutgoingHandler())
                 .postOutbound(ClientboundLoginPacket.class, new LoginPostHandler())
                 .build())
@@ -326,11 +328,13 @@ public final class PacketCodecRegistries {
                 .inbound(ServerboundPongPacket.class, new PongHandler())
                 .inbound(ServerboundClientInformationPacket.class, SClientInformationHandler.INSTANCE)
                 .inbound(ServerboundChatSessionUpdatePacket.class, new SChatSessionUpdateHandler())
+                .inbound(ServerboundPlayerLoadedPacket.class, new SPlayerLoadedHandler())
                 .postOutbound(ClientboundPingPacket.class, new PingPostOutgoingHandler())
                 .outbound(ClientboundTabListPacket.class, new ServerTablistDataOutgoingHandler())
                 .outbound(ClientboundKeepAlivePacket.class, KeepAliveOutgoingHandler.INSTANCE)
                 .outbound(ClientboundPlayerChatPacket.class, new SPlayerChatOutgoingHandler())
                 .outbound(ClientboundDeleteChatPacket.class, new SDeleteChatOutgoingHandler())
+                .outbound(ClientboundRespawnPacket.class, new SRespawnOutgoingHandler())
                 .postOutbound(ClientboundStartConfigurationPacket.class, new ClientStartConfigurationPostOutgoingHandler())
                 .postOutbound(ClientboundTransferPacket.class, new TransferPostOutgoingHandler())
                 .build())

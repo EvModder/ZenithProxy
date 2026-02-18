@@ -1,6 +1,7 @@
 package com.zenith.command.impl;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.zenith.Proxy;
 import com.zenith.cache.data.entity.EntityLiving;
 import com.zenith.cache.data.entity.EntityPlayer;
 import com.zenith.command.api.Command;
@@ -13,8 +14,10 @@ import com.zenith.feature.pathfinder.goals.GoalNear;
 import com.zenith.feature.player.World;
 import com.zenith.mc.block.Block;
 import com.zenith.mc.block.BlockPos;
+import com.zenith.mc.block.BlockRegistry;
 import com.zenith.mc.entity.EntityData;
 import com.zenith.mc.item.ItemData;
+import com.zenith.mc.item.ItemRegistry;
 import com.zenith.util.math.MathHelper;
 
 import java.util.LinkedHashMap;
@@ -86,6 +89,7 @@ public class PathfinderCommand extends Command {
         return command("pathfinder")
             .then(literal("goto")
                 .then(argument("xz", vec2()).executes(c -> {
+                    if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                     var vec2 = getVec2(c, "xz");
                     int x = MathHelper.floorI(vec2.getX());
                     int z = MathHelper.floorI(vec2.getY());
@@ -104,8 +108,10 @@ public class PathfinderCommand extends Command {
                             ? "||[" + x + ", " + z + "]||"
                             : "Coords disabled")
                         .primaryColor();
+                    return OK;
                 }))
                 .then(argument("xyz", blockPos()).executes(c -> {
+                    if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                     var pos = getBlockPos(c, "xyz");
                     int x = pos.x();
                     int y = pos.y();
@@ -125,8 +131,10 @@ public class PathfinderCommand extends Command {
                             ? "||[" + x + ", " + y + ", " + z + "]||"
                             : "Coords disabled")
                         .primaryColor();
+                    return OK;
                 }))
                 .then(argument("waypoint", wordWithChars()).executes(c -> {
+                    if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                     String id = getString(c, "waypoint");
                     var wpOptional = CONFIG.client.extra.waypoints.waypoints.stream()
                         .filter(w -> w.id().equalsIgnoreCase(id))
@@ -174,12 +182,15 @@ public class PathfinderCommand extends Command {
             }))
             .then(literal("follow")
                 .executes(c -> {
+                    if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                     BARITONE.follow((e) -> e instanceof EntityPlayer);
                     c.getSource().getEmbed()
                         .title("Following")
                         .primaryColor();
+                    return OK;
                 })
                 .then(argument("playerName", wordWithChars()).executes(c -> {
+                    if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                     String playerName = getString(c, "playerName");
                     CACHE.getEntityCache().getPlayers().values().stream()
                         .filter(e -> CACHE.getTabListCache()
@@ -211,6 +222,7 @@ public class PathfinderCommand extends Command {
                 }))))
             .then(literal("pickup")
                 .executes(c -> {
+                    if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                     BARITONE.pickup()
                         .addExecutedListener(f -> {
                             c.getSource().getSource().logEmbed(c.getSource(), Embed.builder()
@@ -220,8 +232,10 @@ public class PathfinderCommand extends Command {
                     c.getSource().getEmbed()
                         .title("Picking up all items")
                         .primaryColor();
+                    return OK;
                 })
                 .then(argument("item", item()).executes(c -> {
+                    if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                     var item = getItem(c, "item");
                     if (item == null) {
                         c.getSource().getEmbed()
@@ -241,6 +255,7 @@ public class PathfinderCommand extends Command {
                     return OK;
                 })))
             .then(literal("clearArea").then(argument("pos1", blockPos()).then(argument("pos2", blockPos()).executes(c -> {
+                if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                 var pos1 = getBlockPos(c, "pos1");
                 var pos2 = getBlockPos(c, "pos2");
                 BARITONE.clearArea(pos1, pos2)
@@ -258,8 +273,10 @@ public class PathfinderCommand extends Command {
                         ? "||[" + pos1.x() + ", " + pos1.y() + ", " + pos1.z() + "] <> [" + pos2.x() + ", " + pos2.y() + ", " + pos2.z() + "]||"
                         : "Coords disabled")
                     .primaryColor();
+                return OK;
             }))))
             .then(literal("thisway").then(argument("dist", integer()).executes(c -> {
+                if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                 int dist = getInteger(c, "dist");
                 BARITONE.thisWay(dist)
                     .addExecutedListener(f -> {
@@ -278,6 +295,7 @@ public class PathfinderCommand extends Command {
                 return OK;
             })))
             .then(literal("getTo").then(argument("block", block()).executes(c -> {
+                if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                 Block block = getBlock(c, "block");
                 BARITONE.getTo(block)
                     .addExecutedListener(f -> {
@@ -296,6 +314,7 @@ public class PathfinderCommand extends Command {
                 return OK;
             })))
             .then(literal("mine").then(argument("block", block()).executes(c -> {
+                if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                 Block block = getBlock(c, "block");
                 BARITONE.mine(block);
                 c.getSource().getEmbed()
@@ -307,6 +326,7 @@ public class PathfinderCommand extends Command {
             .then(literal("click")
                 .then(literal("left")
                     .then(argument("pos", blockPos()).executes(c -> {
+                        if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                         var pos = getBlockPos(c, "pos");
                         int x = pos.x();
                         int y = pos.y();
@@ -326,9 +346,11 @@ public class PathfinderCommand extends Command {
                                 ? "||[" + x + ", " + y + ", " + z + "]||"
                                 : "Coords disabled")
                             .primaryColor();
+                        return OK;
                     }))
                     .then(literal("entity")
                         .then(argument("type", entity()).executes(c -> {
+                            if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                             EntityData entityData = getEntity(c, "type");
                             String entityType = entityData.name();
                             var entityOptional = CACHE.getEntityCache().getEntities().values().stream()
@@ -364,6 +386,7 @@ public class PathfinderCommand extends Command {
                             return OK;
                         })))
                     .then(argument("waypoint", wordWithChars()).executes(c -> {
+                        if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                         String id = getString(c, "waypoint");
                         var wpOptional = CONFIG.client.extra.waypoints.waypoints.stream()
                             .filter(w -> w.id().equalsIgnoreCase(id))
@@ -403,6 +426,7 @@ public class PathfinderCommand extends Command {
                     })))
                 .then(literal("right")
                     .then(argument("pos", blockPos()).executes(c -> {
+                        if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                         var pos = getBlockPos(c, "pos");
                         int x = pos.x();
                         int y = pos.y();
@@ -422,9 +446,11 @@ public class PathfinderCommand extends Command {
                                 ? "||[" + x + ", " + y + ", " + z + "]||"
                                 : "Coords disabled")
                             .primaryColor();
+                        return OK;
                     }))
                     .then(literal("entity")
                         .then(argument("id", integer()).executes(c -> {
+                            if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                             var entity = CACHE.getEntityCache().get(getInteger(c, "id"));
                             if (entity == null || !(entity instanceof EntityLiving)) {
                                 c.getSource().getEmbed()
@@ -452,6 +478,7 @@ public class PathfinderCommand extends Command {
                             return OK;
                         }))
                         .then(argument("type", entity()).executes(c -> {
+                            if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                             EntityData entityData = getEntity(c, "type");
                             String entityType = entityData.name();
                             var entityOptional = CACHE.getEntityCache().getEntities().values().stream()
@@ -487,6 +514,7 @@ public class PathfinderCommand extends Command {
                             return OK;
                         })))
                     .then(argument("waypoint", wordWithChars()).executes(c -> {
+                        if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                         String id = getString(c, "waypoint");
                         var wpOptional = CONFIG.client.extra.waypoints.waypoints.stream()
                             .filter(w -> w.id().equalsIgnoreCase(id))
@@ -525,6 +553,7 @@ public class PathfinderCommand extends Command {
                         return OK;
                     }))))
             .then(literal("break").then(argument("pos", blockPos()).executes(c -> {
+                if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                 BlockPos pos = getBlockPos(c, "pos");
                 int x = pos.x();
                 int y = pos.y();
@@ -544,8 +573,10 @@ public class PathfinderCommand extends Command {
                         ? "||[" + x + ", " + y + ", " + z + "]||"
                         : "Coords disabled")
                     .primaryColor();
+                return OK;
             })))
             .then(literal("place").then(argument("pos", blockPos()).then(argument("item", item()).executes(c -> {
+                if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                 BlockPos pos = getBlockPos(c, "pos");
                 ItemData itemData = getItem(c, "item");
                 if (InventoryUtil.searchPlayerInventory(i -> i.getId() == itemData.id()) == -1) {
@@ -576,6 +607,7 @@ public class PathfinderCommand extends Command {
             }))))
             .then(literal("near")
                 .then(argument("pos", blockPos()).then(argument("rangeSq", integer(1)).executes(c -> {
+                    if (!verifyAbleToPathfind(c.getSource().getEmbed())) return ERROR;
                     var pos = getBlockPos(c, "pos");
                     var rangeSq = getInteger(c, "rangeSq");
                     var goal = new GoalNear(pos, rangeSq);
@@ -591,6 +623,7 @@ public class PathfinderCommand extends Command {
                     c.getSource().getEmbed()
                         .title("Pathing")
                         .primaryColor();
+                    return OK;
                 }))))
             .then(literal("status").executes(c -> {
                 boolean isActive = BARITONE.isActive();
@@ -629,11 +662,25 @@ public class PathfinderCommand extends Command {
                     .addField("Allow Break", CONFIG.client.extra.pathfinder.allowBreak)
                     .primaryColor();
             })))
-            .then(literal("blockBreakAdditionalCost").then(argument("cost", floatArg(0, 1000)).executes(c -> {
+            .then(literal("blockBreakAdditionalCost").then(argument("cost", floatArg()).executes(c -> {
                 CONFIG.client.extra.pathfinder.blockBreakAdditionalCost = getFloat(c, "cost");
                 c.getSource().getEmbed()
                     .title("Pathfinder")
                     .addField("Block Break Additional Cost", CONFIG.client.extra.pathfinder.blockBreakAdditionalCost)
+                    .primaryColor();
+            })))
+            .then(literal("blockPlacementPenalty").then(argument("cost", doubleArg()).executes(c -> {
+                CONFIG.client.extra.pathfinder.blockPlacementPenalty = getDouble(c, "cost");
+                c.getSource().getEmbed()
+                    .title("Pathfinder")
+                    .addField("Block Placement Penalty", CONFIG.client.extra.pathfinder.blockPlacementPenalty)
+                    .primaryColor();
+            })))
+            .then(literal("jumpPenalty").then(argument("cost", doubleArg()).executes(c -> {
+                CONFIG.client.extra.pathfinder.jumpPenalty = getDouble(c, "cost");
+                c.getSource().getEmbed()
+                    .title("Pathfinder")
+                    .addField("Jump Penalty", CONFIG.client.extra.pathfinder.jumpPenalty)
                     .primaryColor();
             })))
             .then(literal("allowSprint").then(argument("toggle", toggle()).executes(c -> {
@@ -817,6 +864,121 @@ public class PathfinderCommand extends Command {
                     .title("Pathfinder")
                     .addField("Interact With Process Max Path Tries", CONFIG.client.extra.pathfinder.interactWithProcessMaxPathTries)
                     .primaryColor();
+            })))
+            .then(literal("avoidUpdatingFallingBlocks").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.client.extra.pathfinder.avoidUpdatingFallingBlocks = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("Pathfinder")
+                    .addField("Avoid Updating Falling Blocks", CONFIG.client.extra.pathfinder.avoidUpdatingFallingBlocks)
+                    .primaryColor();
+            })))
+            .then(literal("pauseMiningForFallingBlocks").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.client.extra.pathfinder.pauseMiningForFallingBlocks = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("Pathfinder")
+                    .addField("Pause Mining For Falling Blocks", CONFIG.client.extra.pathfinder.pauseMiningForFallingBlocks)
+                    .primaryColor();
+            })))
+            .then(literal("acceptableThrowawayItems")
+                .then(literal("list").executes(c -> {
+                    CONFIG.client.extra.pathfinder.acceptableThrowawayItems.removeIf(itemName -> ItemRegistry.REGISTRY.get(itemName) == null);
+                    c.getSource().getEmbed()
+                        .title("Pathfinder")
+                        .description(String.join("\n", CONFIG.client.extra.pathfinder.acceptableThrowawayItems))
+                        .primaryColor();
+                }))
+                .then(literal("add").then(argument("item", item()).executes(c -> {
+                    var item = getItem(c, "item");
+                    CONFIG.client.extra.pathfinder.acceptableThrowawayItems.add(item.name());
+                    CONFIG.client.extra.pathfinder.acceptableThrowawayItems.removeIf(itemName -> ItemRegistry.REGISTRY.get(itemName) == null);
+                    c.getSource().getEmbed()
+                        .title("Pathfinder")
+                        .description(String.join("\n", CONFIG.client.extra.pathfinder.acceptableThrowawayItems))
+                        .primaryColor();
+                })))
+                .then(literal("del").then(argument("item", item()).executes(c -> {
+                    var item = getItem(c, "item");
+                    CONFIG.client.extra.pathfinder.acceptableThrowawayItems.remove(item.name());
+                    CONFIG.client.extra.pathfinder.acceptableThrowawayItems.removeIf(itemName -> ItemRegistry.REGISTRY.get(itemName) == null);
+                    c.getSource().getEmbed()
+                        .title("Pathfinder")
+                        .description(String.join("\n", CONFIG.client.extra.pathfinder.acceptableThrowawayItems))
+                        .primaryColor();
+                })))
+                .then(literal("clear").executes(c -> {
+                    CONFIG.client.extra.pathfinder.acceptableThrowawayItems.clear();
+                    c.getSource().getEmbed()
+                        .title("Pathfinder")
+                        .description("Acceptable Throwaway Items Cleared")
+                        .primaryColor();
+                })))
+            .then(literal("allowBreakAnyway")
+                .then(literal("list").executes(c -> {
+                    CONFIG.client.extra.pathfinder.allowBreakAnyway.removeIf(blockName -> BlockRegistry.REGISTRY.get(blockName) == null);
+                    c.getSource().getEmbed()
+                        .title("Pathfinder")
+                        .description(String.join("\n", CONFIG.client.extra.pathfinder.allowBreakAnyway))
+                        .primaryColor();
+                }))
+                .then(literal("add").then(argument("block", block()).executes(c -> {
+                    var block = getBlock(c, "block");
+                    CONFIG.client.extra.pathfinder.allowBreakAnyway.add(block.name());
+                    CONFIG.client.extra.pathfinder.allowBreakAnyway.removeIf(blockName -> BlockRegistry.REGISTRY.get(blockName) == null);
+                    c.getSource().getEmbed()
+                        .title("Pathfinder")
+                        .description(String.join("\n", CONFIG.client.extra.pathfinder.allowBreakAnyway))
+                        .primaryColor();
+                })))
+                .then(literal("del").then(argument("block", block()).executes(c -> {
+                    var block = getBlock(c, "block");
+                    CONFIG.client.extra.pathfinder.allowBreakAnyway.remove(block.name());
+                    CONFIG.client.extra.pathfinder.allowBreakAnyway.removeIf(blockName -> BlockRegistry.REGISTRY.get(blockName) == null);
+                    c.getSource().getEmbed()
+                        .title("Pathfinder")
+                        .description(String.join("\n", CONFIG.client.extra.pathfinder.allowBreakAnyway))
+                        .primaryColor();
+                })))
+                .then(literal("clear").executes(c -> {
+                    CONFIG.client.extra.pathfinder.allowBreakAnyway.clear();
+                    c.getSource().getEmbed()
+                        .title("Pathfinder")
+                        .description(String.join("\n", CONFIG.client.extra.pathfinder.allowBreakAnyway))
+                        .primaryColor();
+                })))
+            .then(literal("autoTool").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.client.extra.pathfinder.autoTool = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("Pathfinder")
+                    .addField("Auto Tool", CONFIG.client.extra.pathfinder.autoTool)
+                    .primaryColor();
+            })))
+            .then(literal("assumeExternalAutoTool").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.client.extra.pathfinder.assumeExternalAutoTool = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("Pathfinder")
+                    .addField("Assume External Auto Tool", CONFIG.client.extra.pathfinder.assumeExternalAutoTool)
+                    .primaryColor();
+            })))
+            .then(literal("itemSaver").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.client.extra.pathfinder.itemSaver = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("Pathfinder")
+                    .addField("Item Saver", CONFIG.client.extra.pathfinder.itemSaver)
+                    .primaryColor();
+            })))
+            .then(literal("itemSaverThreshold").then(argument("threshold", integer()).executes(c -> {
+                CONFIG.client.extra.pathfinder.itemSaverThreshold = getInteger(c, "threshold");
+                c.getSource().getEmbed()
+                    .title("Pathfinder")
+                    .addField("Item Saver Threshold", CONFIG.client.extra.pathfinder.itemSaverThreshold)
+                    .primaryColor();
+            })))
+            .then(literal("preferSilkTouch").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.client.extra.pathfinder.preferSilkTouch = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("Pathfinder")
+                    .addField("Prefer Silk Touch", CONFIG.client.extra.pathfinder.preferSilkTouch)
+                    .primaryColor();
             })));
     }
 
@@ -824,6 +986,8 @@ public class PathfinderCommand extends Command {
         LinkedHashMap<String, String> settingsMap = new LinkedHashMap<>();
         settingsMap.put("allowBreak", toggleStr(CONFIG.client.extra.pathfinder.allowBreak));
         settingsMap.put("blockBreakAdditionalCost", String.valueOf(CONFIG.client.extra.pathfinder.blockBreakAdditionalCost));
+        settingsMap.put("blockPlacementPenalty", String.valueOf(CONFIG.client.extra.pathfinder.blockPlacementPenalty));
+        settingsMap.put("jumpPenalty", String.valueOf(CONFIG.client.extra.pathfinder.jumpPenalty));
         settingsMap.put("allowSprint", toggleStr(CONFIG.client.extra.pathfinder.allowSprint));
         settingsMap.put("allowPlace", toggleStr(CONFIG.client.extra.pathfinder.allowPlace));
         settingsMap.put("allowInventory", toggleStr(CONFIG.client.extra.pathfinder.allowInventory));
@@ -846,6 +1010,20 @@ public class PathfinderCommand extends Command {
         settingsMap.put("renderPathIntervalTicks", String.valueOf(CONFIG.client.extra.pathfinder.pathRenderIntervalTicks));
         settingsMap.put("renderPathDetailed", toggleStr(CONFIG.client.extra.pathfinder.renderPathDetailed));
         settingsMap.put("interactWithProcessMaxPathTries", String.valueOf(CONFIG.client.extra.pathfinder.interactWithProcessMaxPathTries));
+        settingsMap.put("avoidUpdatingFallingBlocks", String.valueOf(CONFIG.client.extra.pathfinder.avoidUpdatingFallingBlocks));
+        settingsMap.put("pauseMiningForFallingBlocks", String.valueOf(CONFIG.client.extra.pathfinder.pauseMiningForFallingBlocks));
+        settingsMap.put("autoTool", toggleStr(CONFIG.client.extra.pathfinder.autoTool));
+        settingsMap.put("assumeExternalAutoTool", toggleStr(CONFIG.client.extra.pathfinder.assumeExternalAutoTool));
+        settingsMap.put("itemSaver", toggleStr(CONFIG.client.extra.pathfinder.itemSaver));
+        settingsMap.put("itemSaverThreshold", String.valueOf(CONFIG.client.extra.pathfinder.itemSaverThreshold));
         return settingsMap;
+    }
+
+    private boolean verifyAbleToPathfind(final Embed embed) {
+        if (Proxy.getInstance().isConnected() && !Proxy.getInstance().hasActivePlayer()) return true;
+        embed
+            .title("Error")
+            .description("Unable to pathfind while not logged in or while a player is controlling");
+        return false;
     }
 }

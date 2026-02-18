@@ -70,7 +70,7 @@ public class MovementParkour extends Movement {
         }
         int standingOn = context.getId(x, y - 1, z);
         Block standingOnBlock = BlockStateInterface.getBlock(standingOn);
-        if (standingOnBlock.blockTags().contains(BlockTags.CLIMBABLE) || standingOnBlock.name().endsWith("_stairs") || BlockStateInterface.isBottomSlab(standingOn)) {
+        if (standingOnBlock.blockTags().contains(BlockTags.CLIMBABLE) || standingOnBlock.blockTags().contains(BlockTags.STAIRS) || BlockStateInterface.isBottomSlab(standingOn)) {
             return;
         }
         if (World.isFluid(context.getBlock(x, y, z))) {
@@ -263,6 +263,7 @@ public class MovementParkour extends Movement {
                         && MovementHelper.attemptToPlaceABlock(state, dest.below(), true, false) == PlaceResult.READY_TO_PLACE
                 ) {
                     // go in the opposite order to check DOWN before all horizontals -- down is preferable because you don't have to look to the side while in midair, which could mess up the trajectory
+                    state.setClickTarget(ctx.getSelectedBlock().orElse(null));
                     state.setInput(PathInput.RIGHT_CLICK_BLOCK, true);
                 }
                 // prevent jumping too late by checking for ascend
