@@ -100,7 +100,7 @@ public class DiscordBot {
         }
         this.presenceUpdateFuture = EXECUTOR.scheduleWithFixedDelay(
             this::tickPresence, 0L,
-            51L
+            51L,
             // 15L, // discord rate limit
             TimeUnit.SECONDS);
     }
@@ -349,7 +349,7 @@ public class DiscordBot {
                 nameList = oldDesc.substring(idx+1);
                 nameListArr = nameList.split("\\n");
                 // 1 in 10 chance of clearing nameList (proportional to # of bots)
-                if(Math.abs(ThreadLocalRandom.current().nextInt()%(5+10*nameListArr.length)) != 0){
+                if(ThreadLocalRandom.current().nextInt()%(5+10*nameListArr.length) == 0){
                     nameList = null;
                 }
             }
@@ -382,7 +382,7 @@ public class DiscordBot {
     }
     public void updateBotInfo() {
         updateBotNickname();
-        updateBotInfo2(null)
+        updateBotInfo2(null);
     }
 
     public void updateBotAvatar() {
