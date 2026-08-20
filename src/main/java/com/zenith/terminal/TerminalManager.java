@@ -70,9 +70,10 @@ public class TerminalManager {
                     return;
                 }
             } catch (final UserInterruptException e) {
-                // ignore. terminal is closing
                 TERMINAL_LOG.info("Exiting...");
-                Proxy.getInstance().stop();
+                EXECUTOR.execute(() -> {
+                    Proxy.getInstance().stop(false);
+                });
                 break;
             } catch (final Exception e) {
                 TERMINAL_LOG.error("Error while reading terminal input", e);

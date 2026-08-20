@@ -40,6 +40,7 @@ public final class Config {
         public String password = "abc123";
         // updated on successful login
         public String username = "Unknown";
+        public @Nullable UUID offlineUUID = null;
         public boolean prio = false;
         public boolean authTokenRefresh = true;
         public int msaLoginAttemptsBeforeCacheWipe = 2;
@@ -81,6 +82,7 @@ public final class Config {
         public final Inventory inventory = new Inventory();
         public final ChatSchemas chatSchemas = new ChatSchemas();
         public final KeepAliveHandling keepAliveHandling = new KeepAliveHandling();
+        public double tickRate = 1.0;
 
         public static final class KeepAliveHandling {
             public KeepAliveMode keepAliveMode = KeepAliveMode.PASSTHROUGH;
@@ -206,6 +208,7 @@ public final class Config {
                 public double blockPlacementPenalty = 20.0;
                 public double blockBreakAdditionalCost = 2;
                 public double jumpPenalty = 2.0;
+                public double lavaWalkCost = 200;
                 public int maxFallHeightNoWater = 3;
                 public boolean allowLongFall = false;
                 public double longFallCostLogMultiplier = 50;
@@ -224,6 +227,7 @@ public final class Config {
                 public boolean getToBlockBlacklistClosestOnFailure = false;
                 public boolean simplifyUnloadedYGoal = false;
                 public boolean placeBlockVerifyAbleToPlace = true;
+                public boolean placeBlockSneak = false;
                 public int interactWithProcessMaxPathTries = 5;
                 public boolean avoidUpdatingFallingBlocks = true;
                 public boolean pauseMiningForFallingBlocks = true;
@@ -249,6 +253,8 @@ public final class Config {
                     ItemRegistry.OAK_PLANKS.name()
                 });
                 public final Set<String> allowBreakAnyway = new ObjectArraySet<>();
+                public final Set<String> blocksToDisallowBreaking = new ObjectArraySet<>();
+                public final Set<String> blocksToAvoid = new ObjectArraySet<>();
             }
 
             public static class SessionTimeLimit {
@@ -433,6 +439,13 @@ public final class Config {
                 public boolean warning = true;
                 public boolean warningMention = false;
                 public boolean allowUnsafeFood = false;
+                public Mode mode = Mode.ALL;
+                public enum Mode {
+                    ALL,
+                    BLACKLIST,
+                    WHITELIST
+                }
+                public HashSet<String> foods = new HashSet<>();
             }
 
             public static final class AutoOmen {
@@ -641,7 +654,7 @@ public final class Config {
         }
 
         public static final class Server {
-            public String address = "connect.2b2t.org";
+            public String address = "2b2t.org";
             public int port = 25565;
         }
 
@@ -685,14 +698,16 @@ public final class Config {
         public boolean botPitchPrecisionClamping = true;
         public boolean botRotateBeforeInteract = true;
         public boolean inventoryRequestServerSyncOnAction = false;
+        public boolean chainBreakSpeed2b2tFix = true;
+        public boolean entityPushing = true;
+        public boolean botAutoExitBed = true;
 
         public static final class PacketLog {
             public boolean enabled = false;
             public boolean logLevelDebug = true;
             public PacketLogConfig clientPacketLog = new PacketLogConfig();
             public PacketLogConfig serverPacketLog = new PacketLogConfig();
-            // todo: could be more flexible, but this can cover the most basic use cases
-            public String packetFilter = "";
+            public ArrayList<String> packetFilterList = new ArrayList<>();
 
             public static final class PacketLogConfig {
                 public boolean received = false;
@@ -744,6 +759,15 @@ public final class Config {
         public boolean updateServerIcon = true;
         public boolean preferLoginAsController = true;
         public final ChatSigning chatSigning = new ChatSigning();
+        public final LoginTimeout loginTimeout = new LoginTimeout();
+        public boolean strictLoginPacketSequence = true;
+
+        public static class LoginTimeout {
+            public boolean enabled = true;
+            public int loginTimeoutTicks = 600;
+            public int statusTimeoutTicks = 100;
+            public int handshakeTimeoutTicks = 40;
+        }
 
         public static final class ChatSigning {
             public ChatSigningMode mode = ChatSigningMode.DISGUISED;
@@ -894,6 +918,7 @@ public final class Config {
         public String notificationMentionRoleId = "";
         public String prefix = ".";
         public boolean ignoreOtherBots = true;
+        public boolean ignoreWebhooks = true;
         public boolean reportCoords = true;
         public boolean mentionRoleOnConnect = false;
         public boolean mentionRoleOnPlayerOnline = false;
@@ -916,6 +941,7 @@ public final class Config {
         public boolean manageDescription = true;
         public boolean managePresence = true;
         public boolean showNonWhitelistLoginIP = true;
+        public int maxQueuedRequestsPerBucket = 100;
         public boolean isUpdating = false; // internal use for update command state persistence
         public final ChatRelay chatRelay = new ChatRelay();
 

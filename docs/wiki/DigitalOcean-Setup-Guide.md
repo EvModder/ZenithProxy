@@ -1,10 +1,11 @@
-[Create an account here ](https://m.do.co/c/f3afffef9a46)[for free $200 credit](https://m.do.co/c/3a3a226e4936)
+[Create an account here](https://m.do.co/c/f3afffef9a46)[ for free $5 credit](https://m.do.co/c/3a3a226e4936)
 
 ## Create a Droplet (VPS)
 ![Create Droplet](./_assets/img/digitalocean-setup/DigitalOcean-Setup-Guide-1.png)
 
 ## Select OS and Specs
 Select New York (any datacenter) for lowest ping to 2b2t and best connection reliability
+
 ![Select OS and Specs](./_assets/img/digitalocean-setup/DigitalOcean-Setup-Guide-2.png)
 
 ![OS and Plan Settings](./_assets/img/digitalocean-setup/DigitalOcean-Setup-Guide-3.png)

@@ -40,7 +40,12 @@ public class MovementPillar extends Movement {
     public static double cost(CalculationContext context, int x, int y, int z) {
         int fromState = context.getId(x, y, z);
         Block fromBlock = BlockStateInterface.getBlock(fromState);
-        boolean ladder = fromBlock == BlockRegistry.LADDER || fromBlock == BlockRegistry.VINE;
+        boolean ladder = fromBlock == BlockRegistry.LADDER
+            || fromBlock == BlockRegistry.VINE
+            || fromBlock == BlockRegistry.TWISTING_VINES
+            || fromBlock == BlockRegistry.TWISTING_VINES_PLANT
+            || fromBlock == BlockRegistry.WEEPING_VINES
+            || fromBlock == BlockRegistry.WEEPING_VINES_PLANT;
         int fromDown = context.getId(x, y - 1, z);
         Block fromDownBlock = BlockStateInterface.getBlock(fromDown);
         if (!ladder) {
@@ -60,10 +65,15 @@ public class MovementPillar extends Movement {
             return COST_INF;
         }
         Block srcUp = null;
-        if (MovementHelper.isWater(toBreakBlock) && MovementHelper.isWater(fromBlock)) { // TODO should this also be allowed if toBreakBlock is air?
+        if (MovementHelper.isLiquid(toBreakBlock) && MovementHelper.isLiquid(fromBlock)) { // TODO should this also be allowed if toBreakBlock is air?
             srcUp = context.getBlock(x, y + 1, z);
-            if (MovementHelper.isWater(srcUp)) {
-                return LADDER_UP_ONE_COST; // allow ascending pillars of water, but only if we're already in one
+            if (MovementHelper.isLiquid(srcUp)) {
+                if (MovementHelper.isWater(srcUp)) {
+                    return LADDER_UP_ONE_COST; // allow ascending pillars of water, but only if we're already in one
+                } else {
+                    // lava
+                    return LADDER_UP_ONE_COST * 10;
+                }
             }
         }
         double placeCost = 0;
@@ -92,7 +102,13 @@ public class MovementPillar extends Movement {
             return COST_INF;
         }
         if (hardness != 0) {
-            if (toBreakBlock == BlockRegistry.LADDER || toBreakBlock == BlockRegistry.VINE) {
+            if (toBreakBlock == BlockRegistry.LADDER
+                || toBreakBlock == BlockRegistry.VINE
+                || toBreakBlock == BlockRegistry.TWISTING_VINES
+                || toBreakBlock == BlockRegistry.TWISTING_VINES_PLANT
+                || toBreakBlock == BlockRegistry.WEEPING_VINES
+                || toBreakBlock == BlockRegistry.WEEPING_VINES_PLANT
+            ) {
                 hardness = 0; // we won't actually need to break the ladder / vine because we're going to use it
             } else {
                 var check = context.getBlock(x, y + 3, z); // the block on top of the one we're going to break, could it fall on us?
@@ -173,7 +189,25 @@ public class MovementPillar extends Movement {
 
         int fromDown = BlockStateInterface.getId(src);
         Block fromDownBlock = BlockStateInterface.getBlock(fromDown);
-        if (MovementHelper.isWater(fromDownBlock) && MovementHelper.isWater(dest)) {
+        if (MovementHelper.isLiquid(fromDownBlock) && MovementHelper.isLiquid(dest)) {
+            var headBonkPos = dest.above(1);
+            var headBonkBlock = BlockStateInterface.getBlock(headBonkPos);
+            var headBonkPos2 = dest.above(2);
+            var headBonkBlock2 = BlockStateInterface.getBlock(headBonkPos2);
+            BlockPos breakHeadBonk = null;
+            if (!MovementHelper.isLiquid(headBonkBlock) && !MovementHelper.canWalkThrough(headBonkPos)) {
+                breakHeadBonk = headBonkPos;
+            } else if (!MovementHelper.isLiquid(headBonkBlock2) && !MovementHelper.canWalkThrough(headBonkPos2)) {
+                breakHeadBonk = headBonkPos2;
+            }
+            if (breakHeadBonk != null) {
+                state.setTarget(new MovementState.MovementTarget(RotationUtils.calcRotationFromVec3d(ctx.playerHead(), VecUtils.calculateBlockCenter(breakHeadBonk), ctx.playerRotations()), false));
+                MovementHelper.switchToBestToolFor(World.getBlock(breakHeadBonk));
+                state.setInput(PathInput.LEFT_CLICK_BLOCK, true);
+                state.setClickTarget(breakHeadBonk);
+                state.setInput(PathInput.JUMP, true);
+                return state;
+            }
             // stay centered while swimming up a water column
             state.setTarget(new MovementState.MovementTarget(RotationUtils.calcRotationFromVec3d(ctx.playerHead(), VecUtils.getBlockPosCenter(dest), ctx.playerRotations()), false));
             Vector3d destCenter = VecUtils.getBlockPosCenter(dest);
@@ -235,7 +269,7 @@ public class MovementPillar extends Movement {
                 int frState = BlockStateInterface.getId(src);
                 Block fr = BlockStateInterface.getBlock(frState);
                 // TODO: Evaluate usage of getMaterial().isReplaceable()
-                if (!(fr.isAir() || fr.replaceable())) {
+                if (!(fr.isAir() || MovementHelper.isReplaceable(src.x(), src.y(), frState))) {
                     RotationUtils.reachable(ctx, src, ctx.player().getBlockReachDistance())
                             .map(rot -> new MovementState.MovementTarget(rot, true))
                             .ifPresent(state::setTarget);
@@ -266,7 +300,7 @@ public class MovementPillar extends Movement {
 //                state.setInput(PathInput.SNEAK, true);
 //            }
 //        }
-        if (MovementHelper.isWater(dest.above())) {
+        if (MovementHelper.isLiquid(dest.above())) {
             return true;
         }
         return super.prepared(state);

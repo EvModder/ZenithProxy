@@ -143,7 +143,7 @@ public abstract class LockingDatabase extends Database {
                     "Player=" + CONFIG.authentication.username + ", " +
                     "IP=" + CONFIG.server.proxyIP + ", " +
                     "Time=" + Instant.now().toString() + ", " +
-                    "Version=" + LAUNCH_CONFIG.version
+                    "Version=" + VERSION
                 );
         } catch (final Exception e) {
             DATABASE_LOG.warn("Error writing lock info to redis for database: {}", getLockKey(), e);
@@ -154,7 +154,7 @@ public abstract class LockingDatabase extends Database {
                 .bind("key", getLockKey())
                 .bind("writing", true)
                 .bind("player_name", CONFIG.authentication.username)
-                .bind("version", LAUNCH_CONFIG.version)
+                .bind("version", VERSION)
                 .execute();
         } catch (final Exception e) {
             DATABASE_LOG.warn("Error writing lock info to db for database: {}", getLockKey(), e);
@@ -168,7 +168,7 @@ public abstract class LockingDatabase extends Database {
                 .bind("key", getLockKey())
                 .bind("writing", false)
                 .bind("player_name", CONFIG.authentication.username)
-                .bind("version", LAUNCH_CONFIG.version)
+                .bind("version", VERSION)
                 .execute();
         } catch (final Exception e) {
             DATABASE_LOG.warn("Error writing lock info to db for database: {}", getLockKey(), e);
@@ -262,11 +262,11 @@ public abstract class LockingDatabase extends Database {
         }
     }
 
-    public void insert(final Instant instant, final HandleConsumer query) {
+    public void insert(final Instant instant, final HandleConsumer<?> query) {
         insert(instant, null, query);
     }
 
-    protected void insert(final Instant instant, final Runnable liveRunnable, final HandleConsumer query) {
+    protected void insert(final Instant instant, final Runnable liveRunnable, final HandleConsumer<?> query) {
         if (insertQueue.size() > getMaxQueueLength()) {
             if (lockAcquired.get()) {
                 DATABASE_LOG.warn("Insert queue size: {} > {} : Flushing {} entries in DB: {}", insertQueue.size(), getMaxQueueLength(), insertQueue.size() - getMaxQueueLength(), getLockKey());
@@ -298,5 +298,5 @@ public abstract class LockingDatabase extends Database {
     }
 
 
-    public record InsertInstance(Instant instant, @Nullable Runnable redisQuery, HandleConsumer query) { }
+    public record InsertInstance(Instant instant, @Nullable Runnable redisQuery, HandleConsumer<?> query) { }
 }

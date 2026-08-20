@@ -1,0 +1,66 @@
+name: 1.21.4 Integ Test
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+\+1.21.4.pre'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup GraalVM
+        uses: graalvm/setup-graalvm@v1
+        with:
+          version: '25.2'
+          distribution: 'graalvm'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Elevate wrapper permissions
+        run: chmod +x ./gradlew
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          dependency-graph: generate-and-submit
+          cache-read-only: ${{ github.event_name == 'pull_request' }}
+
+      - name: Build ZenithProxy
+        run: ./gradlew build
+
+      - name: Setup Plugin Load Test
+        run: |
+          mkdir -p run/plugins
+          wget https://github.com/rfresh2/ZenithProxyWebAPI/releases/download/1.0.5/ZenithProxyWebAPI-1.0.5.jar -O run/plugins/ZenithProxyWebAPI.jar
+          wget https://github.com/rfresh2/ZenithProxyVillagerTrader/releases/download/2.0.3/ZenithProxyVillagerTrader-2.0.3.jar -O run/plugins/ZenithProxyVillagerTrader.jar
+          wget https://github.com/rfresh2/ZenithProxyChatControl/releases/download/1.0.5/ZenithProxyChatControl-1.0.5.jar -O run/plugins/ZenithProxyChatControl.jar
+          wget https://github.com/rfresh2/ZenithProxySparkPlugin/releases/download/1.0.3/ZenithProxySparkPlugin-1.0.3.jar -O run/plugins/ZenithProxySparkPlugin.jar
+
+      - name: Run Plugin Load Test
+        run: ./gradlew pluginLoadTest
+
+      - name: Run Native Tests
+        run: ./gradlew nativeTest
+
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reports
+          path: |
+            **/build/reports/
+            **/build/test-results/
+
+      - name: Upload Java Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ZenithProxy-java
+          path: build/libs/ZenithProxy.jar
+          if-no-files-found: error
+          archive: false

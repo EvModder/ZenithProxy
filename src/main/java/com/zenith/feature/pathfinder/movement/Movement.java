@@ -103,7 +103,7 @@ public abstract class Movement implements IMovement {
             World.getSolidBlockCollisionBoxes(predictedCb, predicatedCollisions);
             boolean willCollide = false;
             for (LocalizedCollisionBox box : predicatedCollisions) {
-                if (box.intersects(BOT.getPlayerCollisionBox())) {
+                if (box.intersects(predictedCb)) {
                     willCollide = true;
                     break;
                 }
@@ -166,6 +166,9 @@ public abstract class Movement implements IMovement {
                         state.setInput(PathInput.LEFT_CLICK_BLOCK, true);
                         state.setClickTarget(blockPos);
                     }
+                    if (MovementHelper.isPlayerTouchingLiquid() && ctx.player().getY() < getDest().y()) {
+                        state.setInput(PathInput.JUMP, true);
+                    }
                     return false;
                 }
                 //get rekt minecraft
@@ -174,7 +177,7 @@ public abstract class Movement implements IMovement {
                 //you dont own me!!!!
                 state.setTarget(new MovementState.MovementTarget(RotationUtils.calcRotationFromVec3d(
                     ctx.playerHead(),
-                    VecUtils.getBlockPosCenter(blockPos), ctx.playerRotations()), true)
+                    VecUtils.calculateBlockCenter(blockPos), ctx.playerRotations()), true)
                 );
                 // don't check selectedblock on this one, this is a fallback when we can't see any face directly, it's intended to be breaking the "incorrect" block
                 state.setInput(PathInput.LEFT_CLICK_BLOCK, true);

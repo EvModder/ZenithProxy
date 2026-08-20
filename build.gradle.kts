@@ -1,8 +1,8 @@
 plugins {
     `java-library`
-    id("org.graalvm.buildtools.native") version "0.11.4"
-    id("com.gradleup.shadow") version "9.3.1"
-    id("io.freefair.lombok") version "9.2.0"
+    id("org.graalvm.buildtools.native") version "1.1.9"
+    id("com.gradleup.shadow") version "9.6.1"
+    id("io.freefair.lombok") version "9.5.0"
     `maven-publish`
 }
 
@@ -11,7 +11,13 @@ version = "1.21.4"
 
 val javaReleaseVersion = 21
 val javaVersion = JavaLanguageVersion.of(25)
-val javaLauncherProvider = javaToolchains.launcherFor { languageVersion = javaVersion }
+val javaLauncherProvider = javaToolchains.launcherFor {
+    languageVersion = javaVersion
+}
+val graalVMJavaLauncher = javaToolchains.launcherFor {
+    languageVersion = javaVersion
+    nativeImageCapable = true
+}
 java {
     toolchain { languageVersion = javaVersion }
     withSourcesJar()
@@ -26,9 +32,9 @@ repositories {
     mavenLocal()
 }
 
-val mcplVersion = "1.21.4.44"
+val mcplVersion = "1.21.4.67"
 dependencies {
-    api("com.github.rfresh2:JDA:6.3.28") {
+    api("com.github.rfresh2:JDA:6.5.35") {
         exclude(group = "club.minnced")
         exclude(group = "net.java.dev.jna")
         exclude(group = "com.google.crypto.tink")
@@ -36,7 +42,7 @@ dependencies {
     api("com.github.rfresh2:MCProtocolLib:$mcplVersion") {
         exclude(group = "io.netty")
     }
-    api(platform("io.netty:netty-bom:4.2.10.Final"))
+    api(platform("io.netty:netty-bom:4.2.17.Final"))
     api("io.netty:netty-buffer")
     api("io.netty:netty-codec-haproxy")
     api("io.netty:netty-codec-dns")
@@ -54,48 +60,51 @@ dependencies {
     api("io.netty:netty-resolver-dns-native-macos") { artifact { classifier = "osx-aarch_64" } }
     api("org.cloudburstmc.math:api:2.0")
     api("org.cloudburstmc.math:immutable:2.0")
-    api("org.redisson:redisson:4.2.0") {
+    api("org.redisson:redisson:4.7.0") {
         exclude(group = "io.netty")
     }
     api("com.github.rfresh2:SimpleEventBus:1.6")
-    val fastutilVersion = "8.5.16"
-    api("com.github.rfresh2.fastutil.maps:object-object-maps:$fastutilVersion")
-    api("com.github.rfresh2.fastutil.maps:int-object-maps:$fastutilVersion")
-    api("com.github.rfresh2.fastutil.maps:object-int-maps:$fastutilVersion")
-    api("com.github.rfresh2.fastutil.maps:long-object-maps:$fastutilVersion")
-    api("com.github.rfresh2.fastutil.maps:int-int-maps:$fastutilVersion")
-    api("com.github.rfresh2.fastutil.maps:int-double-maps:$fastutilVersion")
-    api("com.github.rfresh2.fastutil.maps:reference-object-maps:$fastutilVersion")
-    api("com.github.rfresh2.fastutil.maps:long-double-maps:$fastutilVersion")
-    api("com.github.rfresh2.fastutil.queues:int-queues:$fastutilVersion")
-    api("com.viaversion:viaversion-common:5.7.1")
-    api("com.viaversion:viabackwards-common:5.7.1")
-    api("com.viaversion:viarewind-common:4.0.14")
-    api("org.jline:jline:3.30.6")
+    api(platform("com.github.rfresh2.fastutil:fastutil-bom:8.5.19"))
+    api("com.github.rfresh2.fastutil.maps:object-object-maps")
+    api("com.github.rfresh2.fastutil.maps:int-object-maps")
+    api("com.github.rfresh2.fastutil.maps:object-int-maps")
+    api("com.github.rfresh2.fastutil.maps:long-object-maps")
+    api("com.github.rfresh2.fastutil.maps:int-int-maps")
+    api("com.github.rfresh2.fastutil.maps:int-double-maps")
+    api("com.github.rfresh2.fastutil.maps:reference-object-maps")
+    api("com.github.rfresh2.fastutil.maps:long-double-maps")
+    api("com.github.rfresh2.fastutil.queues:int-queues")
+    api("com.viaversion:viaversion-common:5.11.0")
+    api("com.viaversion:viabackwards-common:5.11.0")
+    api("com.viaversion:viarewind-common:4.1.3")
+    api("org.jline:jline:4.3.1")
     api("ar.com.hjg:pngj:2.1.0")
-    api("com.zaxxer:HikariCP:7.0.2")
-    api("org.postgresql:postgresql:42.7.10")
-    api("org.jdbi:jdbi3-postgres:3.51.0")
-    api("com.google.guava:guava:33.5.0-jre")
-    api("ch.qos.logback:logback-classic:1.5.32")
-    api("org.slf4j:slf4j-api:2.0.17")
-    api("org.slf4j:jul-to-slf4j:2.0.17")
+    api("com.zaxxer:HikariCP:7.1.0")
+    api("org.postgresql:postgresql:42.7.13")
+    api("org.jdbi:jdbi3-postgres:3.54.0")
+    api("com.google.guava:guava:33.6.0-jre")
+    api("ch.qos.logback:logback-classic:1.6.3")
+    api("org.slf4j:slf4j-api:2.0.18")
+    api("org.slf4j:jul-to-slf4j:2.0.18")
     api("com.mojang:brigadier:1.3.10")
     api("net.kyori:adventure-text-logger-slf4j")
     api("dev.omega24:upnp4j:1.0")
-    api(platform("tools.jackson:jackson-bom:3.0.4"))
+    api(platform("tools.jackson:jackson-bom:3.2.2"))
     api("tools.jackson.core:jackson-databind")
+    api("tools.jackson.dataformat:jackson-dataformat-smile")
 
-    testImplementation(platform("org.junit:junit-bom:6.0.3"))
+    testImplementation(platform("org.junit:junit-bom:6.1.3"))
     testImplementation("org.junit.jupiter:junit-jupiter")
+    testImplementation("org.testcontainers:testcontainers:2.0.5")
+    testImplementation("org.testcontainers:testcontainers-junit-jupiter:2.0.5")
     testRuntimeOnly("org.junit.platform:junit-platform-launcher")
     compileOnly("com.google.auto.service:auto-service-annotations:1.1.1")
     annotationProcessor("com.google.auto.service:auto-service:1.1.1")
-    compileOnly("org.graalvm.sdk:nativeimage:25.0.2")
+    compileOnly("org.graalvm.sdk:nativeimage:25.2.4")
 }
 
 lombok {
-    version = "1.18.42"
+    version = "1.18.46"
 }
 
 tasks {
@@ -107,6 +116,9 @@ tasks {
     test {
         useJUnitPlatform()
         workingDir = layout.projectDirectory.dir("run").asFile
+        forkEvery = 1 // needed bc zenith uses global static state
+        maxParallelForks = Runtime.getRuntime().availableProcessors()
+        jvmArgs = listOf("--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow")
     }
     val commitHashTask = register<CommitHashTask>("writeCommitHash") {
         outputFile = project.layout.buildDirectory.file("resources/main/zenith_commit.txt")
@@ -127,11 +139,10 @@ tasks {
         workingDir = layout.projectDirectory.dir("run").asFile
         classpath = sourceSets.main.get().runtimeClasspath
         mainClass.set("com.zenith.Proxy")
-        val args = listOf(
-			"-Xmx300m", "-XX:+UseG1GC", "-XX:+UseCompactObjectHeaders",
-			"--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"
-		)
-        jvmArgs = args
+        jvmArgs = listOf(
+            "-Xmx300m", "-XX:+UseG1GC", "-XX:+UseCompactObjectHeaders",
+            "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow"
+        )
         standardInput = System.`in`
         environment("ZENITH_DEV", "true")
         outputs.upToDateWhen { false }
@@ -149,6 +160,7 @@ tasks {
         val outputFile = project.layout.buildDirectory.file("Commands.md")
         args = listOf(outputFile.get().asFile.absolutePath)
         environment("ZENITH_DEV", "true")
+        jvmArgs = listOf("-Xmx300m", "--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow")
         outputs.file(outputFile)
     }
     val pluginLoadTestTask = register("pluginLoadTest", PluginLoadTestTask::class.java) {
@@ -158,6 +170,7 @@ tasks {
         workingDir = layout.projectDirectory.dir("run").asFile
         classpath = sourceSets.main.get().runtimeClasspath
         mainClass.set("com.zenith.Proxy")
+        jvmArgs = listOf("--enable-native-access=ALL-UNNAMED", "--sun-misc-unsafe-memory-access=allow")
     }
     val updateWikiTask = register<UpdateWikiTask>("updateWiki") {
         inputs.files(generateCommandDocsTask.get().outputs.files)
@@ -196,6 +209,7 @@ tasks {
         archiveBaseName = project.name
         archiveClassifier = ""
         archiveVersion = ""
+        duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
         exclude(listOf(
             "module-info.class", "META-INF/licenses/**", "META-INF/maven/**", "META-INF/proguard/**",
@@ -225,55 +239,44 @@ tasks {
         notCompatibleWithConfigurationCache("not compatible with configuration cache")
         dependsOn(shadowJar)
     }
+    nativeTestCompile {
+        notCompatibleWithConfigurationCache("not compatible with configuration cache")
+    }
+    generateTestResourcesConfigFile {
+        notCompatibleWithConfigurationCache("not compatible with configuration cache")
+    }
 }
 
 graalvmNative {
     binaries {
+        // additional config in: `src/main/resources/META-INF/native-image/com.zenith/zenithproxy/native-image.properties
+        val graalvmBuildArgs = listOf(
+            "-H:DeadlockWatchdogInterval=30",
+            "-H:+CompactingOldGen",
+            "-H:+TrackPrimitiveValues",
+            "-H:+TreatAllTypeReachableConditionsAsTypeReached",
+            "-H:+UsePredicates",
+            "-H:-ReduceImplicitExceptionStackTraceInformation",
+            "--future-defaults=all",
+            "-R:MaxHeapSize=225m",
+            "-march=x86-64-v3",
+            "--gc=serial",
+            "-J-XX:MaxRAMPercentage=90",
+//          "--enable-monitoring=nmt,jfr",
+//          "-H:+PrintClassInitialization"
+        )
         named("main") {
-            javaLauncher = javaLauncherProvider
+            javaLauncher = graalVMJavaLauncher
             imageName = "ZenithProxy"
             mainClass = "com.zenith.Proxy"
             quickBuild = false
             verbose = true
             sharedLibrary = false
-            buildArgs.addAll(
-                "-Duser.country=US",
-                "-Duser.language=en",
-                "--enable-url-protocols=https,http",
-                "-H:+ReportExceptionStackTraces",
-                "-H:DeadlockWatchdogInterval=30",
-                "-H:IncludeLocales=en",
-                "-H:+CompactingOldGen",
-                "-H:+TrackPrimitiveValues",
-                "-H:+UsePredicates",
-                "--future-defaults=all",
-                "-R:MaxHeapSize=200m",
-                "-march=x86-64-v3",
-                "--gc=serial",
-                "-J-XX:MaxRAMPercentage=90",
-//				"--enable-sbom=false", todo: detect and disable on graalvm ce
-//                "--enable-monitoring=nmt,jfr",
-                "-J--enable-native-access=ALL-UNNAMED",
-                "-J--sun-misc-unsafe-memory-access=allow",
-//                "-H:+PrintClassInitialization",
-                "--initialize-at-build-time=com.zenith.feature.deathmessages",
-                "--initialize-at-build-time=org.geysermc.mcprotocollib.protocol.data.game.inventory.ContainerType",
-                "--initialize-at-build-time=org.cloudburstmc.math.immutable.vector.ImmutableVector3i",
-                "--initialize-at-build-time=com.google.common.collect.RegularImmutableList",
-                "--initialize-at-build-time=org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType",
-                "--initialize-at-build-time=org.geysermc.mcprotocollib.protocol.data.game.level.block.BlockEntityType",
-                "--initialize-at-build-time=it.unimi.dsi.fastutil",
-                "--initialize-at-build-time=com.google.common.collect",
-                "--initialize-at-build-time=com.zenith.mc",
-                "--initialize-at-build-time=com.zenith.event",
-                "--initialize-at-run-time=com.zenith.mc.chat_type",
-                "--initialize-at-run-time=com.zenith.mc.item",
-                "--initialize-at-run-time=sun.net.dns.ResolverConfigurationImpl", // fix for windows builds, exception when doing srv lookups with netty
-                "--features=com.zenith.util.graalvm.ReflectionFeature"
-            )
+            buildArgs.addAll(graalvmBuildArgs)
             val pgoPath = providers.environmentVariable("GRAALVM_PGO_PATH").orNull
-			val pgoInstrument = providers.environmentVariable("GRAALVM_PGO_INSTRUMENT").orNull
-			val trace = providers.environmentVariable("GRAALVM_NATIVE_IMAGE_TRACE").orNull
+            val pgoInstrument = providers.environmentVariable("GRAALVM_PGO_INSTRUMENT").orNull
+            val trace = providers.environmentVariable("GRAALVM_NATIVE_IMAGE_TRACE").orNull
+            val buildReport = providers.environmentVariable("GRAALVM_BUILD_REPORT").orNull
             if (pgoPath != null) {
                 println("Using PGO profile: $pgoPath")
                 buildArgs.add("--pgo=$pgoPath")
@@ -284,10 +287,21 @@ graalvmNative {
                     buildArgs.add("--pgo-instrument")
                     buildArgs.add("-R:ProfilesDumpFile=profile.iprof")
                 } else if (trace != null) {
-					println("Enabling tracing agent")
-					buildArgs.add("-H:Preserve=all")
-				}
+                    println("Enabling tracing agent")
+                    buildArgs.add("-H:Preserve=all")
+                }
             }
+            if (buildReport != null) {
+                buildArgs.add("--emit build-report")
+            }
+            configurationFileDirectories.from(file("src/main/resources/META-INF/native-image"))
+        }
+        named("test") {
+            javaLauncher = graalVMJavaLauncher
+            quickBuild = true
+            verbose = true
+            debug = true
+            buildArgs.addAll(graalvmBuildArgs)
             configurationFileDirectories.from(file("src/main/resources/META-INF/native-image"))
         }
     }

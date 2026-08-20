@@ -13,7 +13,7 @@ import com.zenith.event.queue.QueuePositionUpdateEvent;
 import com.zenith.event.queue.QueueSkipEvent;
 import com.zenith.event.queue.QueueStartEvent;
 import com.zenith.event.server.ServerIconBuildEvent;
-import com.zenith.feature.api.mcsrvstatus.MCSrvStatusApi;
+import com.zenith.feature.api.mcstatus.MCStatusApi;
 import com.zenith.feature.autoupdater.AutoUpdater;
 import com.zenith.feature.autoupdater.NoOpAutoUpdater;
 import com.zenith.feature.autoupdater.RestAutoUpdater;
@@ -36,16 +36,16 @@ import dev.omega24.upnp4j.util.Protocol;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
+import net.kyori.adventure.key.Key;
 import net.raphimc.minecraftauth.bedrock.exception.MinecraftRequestException;
 import org.geysermc.mcprotocollib.auth.GameProfile;
-import org.geysermc.mcprotocollib.network.BuiltinFlags;
 import org.geysermc.mcprotocollib.network.ProxyInfo;
 import org.geysermc.mcprotocollib.network.tcp.TcpConnectionManager;
 import org.geysermc.mcprotocollib.network.tcp.TcpServer;
 import org.geysermc.mcprotocollib.protocol.MinecraftConstants;
 import org.geysermc.mcprotocollib.protocol.MinecraftProtocol;
+import org.geysermc.mcprotocollib.protocol.packet.common.clientbound.ServerboundCookieResponsePacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundTabListPacket;
-import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.player.ServerboundSetCarriedItemPacket;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.LoggerFactory;
@@ -134,7 +134,7 @@ public class Proxy {
     }
 
     public void start() {
-        DEFAULT_LOG.info("Starting ZenithProxy-{}", LAUNCH_CONFIG.version);
+        DEFAULT_LOG.info("Starting ZenithProxy-{}", VERSION);
         var exeReleaseVersion = getExecutableReleaseVersion();
         if (exeReleaseVersion == null) {
             DEFAULT_LOG.warn("Detected unofficial ZenithProxy development build!");
@@ -160,8 +160,18 @@ public class Proxy {
             MODULE.init();
             this.tcpManager = new TcpConnectionManager();
             if (CONFIG.database.enabled) {
-                DATABASE.start();
-                DEFAULT_LOG.info("Started Databases");
+                try {
+                    EXECUTOR.submit(() -> {
+                        try {
+                            DATABASE.start();
+                            DATABASE_LOG.info("Started Databases");
+                        } catch (final Exception e) {
+                            DATABASE_LOG.error("Failed starting database", e);
+                        }
+                    }).get(10L, TimeUnit.SECONDS);
+                } catch (final Exception e) {
+                    DATABASE_LOG.error("Database start timeout", e);
+                }
             }
             if (CONFIG.discord.enable) {
                 try {
@@ -327,7 +337,7 @@ public class Proxy {
             SERVER_LOG.debug("Proxy IP is set to localhost, skipping connection test");
             return;
         }
-        MCSrvStatusApi.INSTANCE.getMCSrvStatus(CONFIG.server.getProxyAddress())
+        MCStatusApi.INSTANCE.getMCServerStatus(CONFIG.server.getProxyAddress())
             .ifPresentOrElse(response -> {
                 if (response.online()) {
                     SERVER_LOG.debug("Connection test successful: {}", address);
@@ -422,9 +432,8 @@ public class Proxy {
     public void kickDisconnect(final String reason, final Throwable cause) {
         if (!isConnected()) return;
         var client = this.client;
-
         try {
-            client.send(new ServerboundSetCarriedItemPacket(10)).get();
+            client.send(new ServerboundCookieResponsePacket(Key.key("minecraft", "pls_kick"), null)).get();
         } catch (final Exception e) {
             CLIENT_LOG.error("Error performing kick disconnect", e);
         }
@@ -467,8 +476,6 @@ public class Proxy {
         }
         CLIENT_LOG.info("Connecting to {}:{}...", address, port);
         this.client = new ClientSession(address, port, CONFIG.client.bindAddress, minecraftProtocol, getClientProxyInfo(), tcpManager);
-        if (Objects.equals(address, "connect.2b2t.org"))
-            this.client.setFlag(BuiltinFlags.ATTEMPT_SRV_RESOLVE, false);
         this.client.setReadTimeout(CONFIG.client.timeout.enable ? CONFIG.client.timeout.seconds : 0);
         this.client.setFlag(MinecraftConstants.CLIENT_CHANNEL_INITIALIZER, ZenithClientChannelInitializer.FACTORY);
         this.client.connect(true);
@@ -827,11 +834,18 @@ public class Proxy {
     public void handleStartQueueEvent(QueueStartEvent event) {
         this.inQueue = true;
         this.queuePosition = 0;
-        if (event.wasOnline()) this.connectTime = Instant.now();
+        if (event.wasOnline()) {
+            this.prevOnlineSeconds = OptionalLong.of(this.prevOnlineSeconds.orElse(0L) + Duration.between(this.connectTime, Instant.now()).toSeconds());
+            this.didQueueSkip = true;
+            this.connectTime = Instant.now();
+        }
     }
 
     public void handleQueuePositionUpdateEvent(QueuePositionUpdateEvent event) {
         this.queuePosition = event.position();
+        // we don't receive position updates when queue skipping
+        this.prevOnlineSeconds = OptionalLong.empty();
+        this.didQueueSkip = false;
     }
 
     public void handleQueueCompleteEvent(QueueCompleteEvent event) {

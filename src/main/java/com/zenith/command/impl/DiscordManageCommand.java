@@ -12,6 +12,8 @@ import net.dv8tion.jda.internal.utils.ShutdownReason;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 
+import static com.mojang.brigadier.arguments.IntegerArgumentType.getInteger;
+import static com.mojang.brigadier.arguments.IntegerArgumentType.integer;
 import static com.zenith.Globals.*;
 import static com.zenith.command.brigadier.CustomStringArgumentType.getString;
 import static com.zenith.command.brigadier.CustomStringArgumentType.wordWithChars;
@@ -44,7 +46,8 @@ public class DiscordManageCommand extends Command {
                 "manageDescription on/off",
                 "managePresence on/off",
                 "showNonWhitelistIP on/off",
-                "ignoreOtherBots on/off"
+                "ignoreOtherBots on/off",
+                "ignoreWebhooks on/off"
             )
             .build();
     }
@@ -183,6 +186,16 @@ public class DiscordManageCommand extends Command {
                 CONFIG.discord.ignoreOtherBots = getToggle(c, "toggle");
                 c.getSource().getEmbed()
                     .title("Ignore Other Bots " + toggleStrCaps(CONFIG.discord.ignoreOtherBots));
+            })))
+            .then(literal("ignoreWebhooks").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.discord.ignoreWebhooks = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("Ignore Webhooks " + toggleStrCaps(CONFIG.discord.ignoreWebhooks));
+            })))
+            .then(literal("maxQueuedRequestsPerBucket").then(argument("limit", integer(0)).executes(c -> {
+                CONFIG.discord.maxQueuedRequestsPerBucket = getInteger(c, "limit");
+                c.getSource().getEmbed()
+                    .title("Max Queued Requests Per Bucket Set");
             })));
     }
 
@@ -204,6 +217,7 @@ public class DiscordManageCommand extends Command {
             .addField("Manage Presence", toggleStr(CONFIG.discord.managePresence))
             .addField("Show Non-Whitelist IP", toggleStr(CONFIG.discord.showNonWhitelistLoginIP))
             .addField("Ignore Other Bots", toggleStr(CONFIG.discord.ignoreOtherBots))
+            .addField("Ignore Webhooks", toggleStr(CONFIG.discord.ignoreWebhooks))
             .primaryColor();
     }
 

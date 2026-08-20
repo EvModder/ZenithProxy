@@ -140,7 +140,8 @@ public class MovementAscend extends Movement {
 
     @Override
     public MovementState updateState(MovementState state) {
-        if (ctx.playerFeet().y() < src.y()) {
+        var isTouchingLiquid = MovementHelper.isPlayerTouchingLiquid();
+        if (ctx.playerFeet().y() < src.y() && !isTouchingLiquid) {
             // this check should run even when in preparing state (breaking blocks)
             return state.setStatus(MovementStatus.UNREACHABLE);
         }
@@ -177,7 +178,7 @@ public class MovementAscend extends Movement {
             return state; // don't jump while walking from a non double slab into a bottom slab
         }
 
-        if (ctx.playerFeet().equals(src.above())) {
+        if (ctx.playerFeet().equals(src.above()) && !MovementHelper.isLiquid(ctx.playerFeet())) {
             // no need to hit space if we're already jumping
             return state;
         }

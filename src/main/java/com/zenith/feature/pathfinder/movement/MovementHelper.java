@@ -34,23 +34,31 @@ public final class MovementHelper {
 //            return true;
 //        }
         Block b = BlockStateInterface.getBlock(state);
-        return // Baritone.settings().blocksToDisallowBreaking.value.contains(b) ||
+        return CONFIG.client.extra.pathfinder.blocksToDisallowBreaking.contains(b.name()) ||
             b == BlockRegistry.ICE // ice becomes water, and water can mess up the path
                 || b.name().startsWith("infested_") // b instanceof InfestedBlock // obvious reasons
                 // call context.get directly with x,y,z. no need to make 5 new BlockPos for no reason
-                || avoidAdjacentBreaking(x, y + 1, z, true)
-                || avoidAdjacentBreaking(x + 1, y, z, false)
-                || avoidAdjacentBreaking(x - 1, y, z, false)
-                || avoidAdjacentBreaking(x, y, z + 1, false)
-                || avoidAdjacentBreaking(x, y, z - 1, false);
+                || avoidAdjacentBreaking(x, y + 1, z, true, false)
+                || avoidAdjacentBreaking(x, y - 1, z, false, true)
+                || avoidAdjacentBreaking(x + 1, y, z, false, false)
+                || avoidAdjacentBreaking(x - 1, y, z, false, false)
+                || avoidAdjacentBreaking(x, y, z + 1, false, false)
+                || avoidAdjacentBreaking(x, y, z - 1, false, false);
     }
 
-    public static boolean avoidAdjacentBreaking(int x, int y, int z, boolean directlyAbove) {
+    public static boolean avoidAdjacentBreaking(int x, int y, int z, boolean directlyAbove, boolean directlyBelow) {
         // returns true if you should avoid breaking a block that's adjacent to this one (e.g. lava that will start flowing if you give it a path)
-        // this is only called for north, south, east, west, and up. this is NOT called for down.
+        // this is only called for north, south, east, west, up, and down
         // we assume that it's ALWAYS okay to break the block thats ABOVE liquid
         int state = BlockStateInterface.getId(x, y, z);
         Block block = BlockStateInterface.getBlock(state);
+
+        if (directlyBelow) {
+            return block.fallingBlock()
+                && CONFIG.client.extra.pathfinder.avoidUpdatingFallingBlocks
+                && freeForFallingBlock(x, y - 1, z);
+        }
+
         if (!directlyAbove // it is fine to mine a block that has a falling block directly above, this (the cost of breaking the stacked fallings) is included in cost calculations
             // therefore if directlyAbove is true, we will actually ignore if this is falling
             && block.fallingBlock() // obviously, this check is only valid for falling blocks
@@ -75,6 +83,9 @@ public final class MovementHelper {
 
     static boolean freeForFallingBlock(int x, int y, int z) {
         var block = BlockStateInterface.getBlock(x, y, z);
+        if (block.fallingBlock()) {
+            return freeForFallingBlock(x, y - 1, z);
+        }
         return block.isAir()
             || block == BlockRegistry.FIRE || block == BlockRegistry.SOUL_FIRE
             || isLiquid(block)
@@ -133,9 +144,9 @@ public final class MovementHelper {
         if (block == BlockRegistry.POWDER_SNOW) {
             return NO;
         }
-//        if (Baritone.settings().blocksToAvoid.value.contains(block)) {
-//            return NO;
-//        }
+        if (CONFIG.client.extra.pathfinder.blocksToAvoid.contains(block.name())) {
+            return NO;
+        }
         if (block.blockTags().contains(BlockTags.DOORS) || block.blockTags().contains(BlockTags.FENCE_GATES)) {
             // TODO this assumes that all doors in all mods are openable
             if (block == BlockRegistry.IRON_DOOR) {
@@ -155,11 +166,7 @@ public final class MovementHelper {
         if (isFluid) {
             FluidState fluidState = World.getFluidState(blockStateId);
             if (fluidState != null) {
-                if (fluidState.amount() != 8) {
-                    return NO;
-                } else {
-                    return MAYBE;
-                }
+                return MAYBE;
             }
 
         }
@@ -198,7 +205,10 @@ public final class MovementHelper {
 
         boolean isFluid = World.isFluid(block);
         if (isFluid) {
-            if (isFlowing(x, y, z)) {
+            var playerInLava = PlayerContext.INSTANCE.player().isTouchingLava() || MovementHelper.isLava(World.getBlock(PlayerContext.INSTANCE.playerFeet()));
+            var playerInWater = PlayerContext.INSTANCE.player().isTouchingWater() || MovementHelper.isWater(World.getBlock(PlayerContext.INSTANCE.playerFeet()));
+            var playerInFluid = playerInLava || playerInWater;
+            if (isFlowing(x, y, z) && !playerInFluid) {
                 return false;
             }
             // Everything after this point has to be a special case as it relies on the water not being flowing, which means a special case is needed.
@@ -209,6 +219,9 @@ public final class MovementHelper {
             Block up = BlockStateInterface.getBlock(x, y + 1, z);
             if (World.isFluid(up) || up == BlockRegistry.LILY_PAD) {
                 return false;
+            }
+            if (isLava(block)) {
+                return playerInLava;
             }
             return World.isWater(block);
         }
@@ -227,6 +240,10 @@ public final class MovementHelper {
             || block == BlockRegistry.COBWEB
             || block == BlockRegistry.VINE
             || block == BlockRegistry.LADDER
+            || block == BlockRegistry.TWISTING_VINES
+            || block == BlockRegistry.TWISTING_VINES_PLANT
+            || block == BlockRegistry.WEEPING_VINES
+            || block == BlockRegistry.WEEPING_VINES_PLANT
             || block == BlockRegistry.COCOA
             || block == BlockRegistry.AZALEA || block == BlockRegistry.FLOWERING_AZALEA
             || block.blockTags().contains(BlockTags.DOORS)
@@ -291,10 +308,10 @@ public final class MovementHelper {
             var layersProperty = World.getBlockStateProperty(blockStateId, BlockStateProperties.LAYERS);
             return layersProperty != null && layersProperty == 1;
         }
-        if (block == BlockRegistry.LARGE_FERN || block == BlockRegistry.TALL_GRASS) {
+        if (block == BlockRegistry.LARGE_FERN || block == BlockRegistry.TALL_GRASS || block == BlockRegistry.SCULK_VEIN) {
             return true;
         }
-        return false; // state.canBeReplaced();
+        return block.replaceable();
     }
 
     public static boolean isDoorPassable(BlockPos doorPos, BlockPos playerPos) {
@@ -379,7 +396,13 @@ public final class MovementHelper {
         if (block == BlockRegistry.AZALEA || block == BlockRegistry.FLOWERING_AZALEA) {
             return YES;
         }
-        if (block == BlockRegistry.LADDER) { // TODO reconsider this
+        if (block == BlockRegistry.LADDER
+            || block == BlockRegistry.VINE
+            || block == BlockRegistry.TWISTING_VINES
+            || block == BlockRegistry.TWISTING_VINES_PLANT
+            || block == BlockRegistry.WEEPING_VINES
+            || block == BlockRegistry.WEEPING_VINES_PLANT)
+        { // TODO reconsider this
             return YES;
         }
         if (block == BlockRegistry.FARMLAND || block == BlockRegistry.DIRT_PATH || block == BlockRegistry.SOUL_SAND) {
@@ -401,7 +424,7 @@ public final class MovementHelper {
         if (block.blockTags().contains(BlockTags.STAIRS)) {
             return YES;
         }
-        if (isWater(block)) {
+        if (isLiquid(block)) {
             return MAYBE;
         }
 //        MovementHelper.isLava(block);
@@ -413,7 +436,12 @@ public final class MovementHelper {
 
     public static boolean canWalkOnPosition(int x, int y, int z, int blockStateId) {
         Block block = BlockStateInterface.getBlock(blockStateId);
-        if (isWater(block)) {
+        if (isLiquid(block)) {
+            var playerInLava = PlayerContext.INSTANCE.player().isTouchingLava() || MovementHelper.isLava(World.getBlock(PlayerContext.INSTANCE.playerFeet()));
+            if (isLava(block) && !playerInLava) {
+                return false;
+            }
+
             // since this is called literally millions of times per second, the benefit of not allocating millions of useless "pos.up()"
             // BlockPos s that we'd just garbage collect immediately is actually noticeable. I don't even think its a decrease in readability
             int upState = BlockStateInterface.getId(x, y + 1, z);
@@ -423,16 +451,16 @@ public final class MovementHelper {
             }
             if (MovementHelper.isFlowing(x, y, z) || MovementHelper.isFlowing(x, y + 1, z)) {
                 // the only scenario in which we can walk on flowing water is if it's under still water with jesus off
-                return isWater(up);
+                return isLiquid(up);
             }
             // if assumeWalkOnWater is on, we can only walk on water if there isn't water above it
             // if assumeWalkOnWater is off, we can only walk on water if there is water above it
-            return isWater(up);
+            return isLiquid(up);
         }
 
-        if (MovementHelper.isLava(block)) {
-            MovementHelper.isFlowing(x, y, z);
-        }
+//        if (MovementHelper.isLava(state) && !MovementHelper.isFlowing(x, y, z, state, bsi) && Baritone.settings().assumeWalkOnLava.value) { // if we get here it means that assumeWalkOnLava must be true, so put it last
+//            return true;
+//        }
 
         return false; // If we don't recognise it then we want to just return false to be safe.
     }
@@ -641,7 +669,7 @@ public final class MovementHelper {
         Rotation targetRotation = state.getTarget().rotation();
         MutableVec3d playerVelocity = ctx.player().getVelocity();
         double velThreshold = 0.02;
-        if (Math.abs(playerVelocity.getX()) > velThreshold || Math.abs(playerVelocity.getZ()) > velThreshold) {
+        if (!BOT.isHorizontalCollision() && (Math.abs(playerVelocity.getX()) > velThreshold || Math.abs(playerVelocity.getZ()) > velThreshold)) {
             double velX = MathHelper.round(playerVelocity.getX(), 3);
             double velZ = MathHelper.round(playerVelocity.getZ(), 3);
             // we really only care about the x and z components of the velocity
@@ -745,6 +773,18 @@ public final class MovementHelper {
 
     public static boolean isLiquid(Block block) {
         return World.isFluid(block);
+    }
+
+    public static boolean isPlayerTouchingWater() {
+        return PlayerContext.INSTANCE.player().isTouchingWater() || MovementHelper.isWater(World.getBlock(PlayerContext.INSTANCE.playerFeet()));
+    }
+
+    public static boolean isPlayerTouchingLava() {
+        return PlayerContext.INSTANCE.player().isTouchingLava() || MovementHelper.isLava(World.getBlock(PlayerContext.INSTANCE.playerFeet()));
+    }
+
+    public static boolean isPlayerTouchingLiquid() {
+        return isPlayerTouchingWater() || isPlayerTouchingLava();
     }
 
 //    static boolean possiblyFlowing(BlockState state) {

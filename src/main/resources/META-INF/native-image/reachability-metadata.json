@@ -667,6 +667,15 @@
       ]
     },
     {
+      "type": "com.google.gson.internal.bind.JavaTimeTypeAdapters",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
       "type": "com.pgvector.PGvector"
     },
     {
@@ -1226,6 +1235,15 @@
       ]
     },
     {
+      "type": "com.viaversion.viaversion.libs.gson.internal.bind.JavaTimeTypeAdapters",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
       "type": "com.viaversion.viaversion.libs.opennbt.tag.builtin.CompoundTag",
       "allDeclaredFields": true,
       "methods": [
@@ -1244,6 +1262,9 @@
     },
     {
       "type": "com.viaversion.viaversion.libs.opennbt.tag.builtin.Tag[]"
+    },
+    {
+      "type": "com.viaversion.viaversion.platform.ViaCodecHandler"
     },
     {
       "type": "com.viaversion.viaversion.protocols.protocol1_13to1_12_2.data.EntityTypeRewriter",
@@ -1677,6 +1698,33 @@
       ]
     },
     {
+      "type": "com.zenith.feature.api.mccompanion.model.MCCompanionBedrockResponse",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "java.lang.String",
+            "java.lang.String",
+            "java.util.UUID",
+            "java.lang.String"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.feature.api.mccompanion.model.MCCompanionJavaResponse",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "java.lang.String",
+            "java.util.UUID",
+            "java.lang.String"
+          ]
+        }
+      ]
+    },
+    {
       "type": "com.zenith.feature.api.mcprofile.model.MCProfileBedrockResponse",
       "methods": [
         {
@@ -1690,6 +1738,21 @@
             "boolean",
             "java.lang.String",
             "java.lang.String"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.feature.api.mcprofile.model.MCProfileJavaResponse",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "java.lang.String",
+            "java.util.UUID",
+            "java.lang.String",
+            "java.lang.String",
+            "boolean"
           ]
         }
       ]
@@ -1709,9 +1772,32 @@
       ]
     },
     {
+      "type": "com.zenith.feature.api.mcstatus.model.MCStatusMotdData",
+      "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "java.lang.String",
+            "java.lang.String",
+            "java.lang.String"
+          ]
+        }
+      ]
+    },
+    {
       "type": "com.zenith.feature.api.mcstatus.model.MCStatusResponse",
       "allDeclaredFields": true,
       "methods": [
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "boolean",
+            "java.lang.String",
+            "int",
+            "com.zenith.feature.api.mcstatus.model.MCStatusMotdData",
+            "java.lang.String"
+          ]
+        },
         {
           "name": "<init>",
           "parameterTypes": [
@@ -2275,6 +2361,23 @@
             "java.lang.String",
             "float",
             "float",
+            "float",
+            "boolean",
+            "boolean",
+            "boolean",
+            "boolean",
+            "boolean",
+            "org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType",
+            "com.zenith.mc.entity.EntityAttachment"
+          ]
+        },
+        {
+          "name": "<init>",
+          "parameterTypes": [
+            "int",
+            "java.lang.String",
+            "float",
+            "float",
             "boolean",
             "boolean",
             "boolean",
@@ -2675,6 +2778,20 @@
         {
           "name": "<init>",
           "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "com.zenith.util.config.Config$Client$Extra$AutoEat$Mode",
+      "fields": [
+        {
+          "name": "ALL"
+        },
+        {
+          "name": "BLACKLIST"
+        },
+        {
+          "name": "WHITELIST"
         }
       ]
     },
@@ -4476,6 +4593,15 @@
       "type": "java.lang.Long[]"
     },
     {
+      "type": "java.lang.Module",
+      "methods": [
+        {
+          "name": "isNativeAccessEnabled",
+          "parameterTypes": []
+        }
+      ]
+    },
+    {
       "type": "java.lang.Number",
       "serializable": true
     },
@@ -4640,6 +4766,60 @@
       "fields": [
         {
           "name": "TYPE"
+        }
+      ]
+    },
+    {
+      "type": "java.lang.foreign.MemorySegment",
+      "methods": [
+        {
+          "name": "address",
+          "parameterTypes": []
+        },
+        {
+          "name": "ofBuffer",
+          "parameterTypes": [
+            "java.nio.Buffer"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "java.lang.invoke.MethodHandles",
+      "methods": [
+        {
+          "name": "byteArrayViewVarHandle",
+          "parameterTypes": [
+            "java.lang.Class",
+            "java.nio.ByteOrder"
+          ]
+        },
+        {
+          "name": "byteBufferViewVarHandle",
+          "parameterTypes": [
+            "java.lang.Class",
+            "java.nio.ByteOrder"
+          ]
+        },
+        {
+          "name": "privateLookupIn",
+          "parameterTypes": [
+            "java.lang.Class",
+            "java.lang.invoke.MethodHandles$Lookup"
+          ]
+        }
+      ]
+    },
+    {
+      "type": "java.lang.invoke.MethodHandles$Lookup",
+      "methods": [
+        {
+          "name": "findVarHandle",
+          "parameterTypes": [
+            "java.lang.Class",
+            "java.lang.String",
+            "java.lang.Class"
+          ]
         }
       ]
     },
@@ -5218,6 +5398,17 @@
       "type": "java.util.RandomAccess"
     },
     {
+      "type": "java.util.SplittableRandom",
+      "methods": [
+        {
+          "name": "nextBytes",
+          "parameterTypes": [
+            "byte[]"
+          ]
+        }
+      ]
+    },
+    {
       "type": "java.util.TreeMap",
       "serializable": true
     },
@@ -5552,6 +5743,21 @@
         {
           "name": "getUnsafe",
           "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "jdk.jfr.FlightRecorder",
+      "methods": [
+        {
+          "name": "isAvailable",
+          "parameterTypes": []
+        },
+        {
+          "name": "register",
+          "parameterTypes": [
+            "java.lang.Class"
+          ]
         }
       ]
     },
@@ -5991,6 +6197,9 @@
       "type": "org.jdbi.v3.json.JsonConfig"
     },
     {
+      "type": "org.jdbi.v3.meta.Legacy"
+    },
+    {
       "type": "org.jdbi.v3.postgres.PostgresTypes",
       "methods": [
         {
@@ -6421,6 +6630,17 @@
         {
           "name": "<init>",
           "parameterTypes": []
+        }
+      ]
+    },
+    {
+      "type": "org.jline.terminal.impl.ffm.FfmSignalHandler",
+      "methods": [
+        {
+          "name": "signalReceived",
+          "parameterTypes": [
+            "int"
+          ]
         }
       ]
     },
@@ -8603,6 +8823,13 @@
     {
       "type": {
         "proxy": [
+          "org.jdbi.v3.meta.Legacy"
+        ]
+      }
+    },
+    {
+      "type": {
+        "proxy": [
           "org.redisson.api.RLock"
         ]
       }
@@ -8720,9 +8947,22 @@
     },
     {
       "type": "javax.management.remote.rmi.RMIServerImpl_Stub"
+    },
+    {
+      "type": "org.junit.platform.engine.UniqueId$SerializedForm"
     }
   ],
   "foreign": {
+    "directUpcalls": [
+      {
+        "class": "org.jline.terminal.impl.ffm.FfmSignalHandler",
+        "method": "signalReceived",
+        "returnType": "void",
+        "parameterTypes": [
+          "jint"
+        ]
+      }
+    ],
     "downcalls": [
       {
         "returnType": "jint",
@@ -8753,6 +8993,14 @@
         "parameterTypes": [
           "jint",
           "jint",
+          "void*"
+        ]
+      },
+      {
+        "returnType": "jint",
+        "parameterTypes": [
+          "jint",
+          "void*",
           "void*"
         ]
       },

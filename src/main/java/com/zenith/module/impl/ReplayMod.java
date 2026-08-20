@@ -1,6 +1,7 @@
 package com.zenith.module.impl;
 
 import com.github.rfresh2.EventConsumer;
+import com.zenith.discord.Embed;
 import com.zenith.event.client.ClientConnectEvent;
 import com.zenith.event.client.ClientDisconnectEvent;
 import com.zenith.event.client.ClientTickEvent;
@@ -35,6 +36,7 @@ public class ReplayMod extends Module {
     private ReplayRecording replayRecording = new ReplayRecording(replayDirectory);
     private final ReplayModPersistentEventListener persistentEventListener = new ReplayModPersistentEventListener(this);
     private @Nullable ScheduledFuture<?> delayedRecordingStopFuture;
+    private final long minFreeSpaceBytes = 10L * 1024L * 1024L;
 
     public ReplayMod() {
         super();
@@ -104,6 +106,15 @@ public class ReplayMod extends Module {
         if (!replayRecording.ready()) return;
         var startT = replayRecording.getStartT();
         if (startT == 0L) return;
+        if (replayDirectory.toFile().getUsableSpace() < minFreeSpaceBytes) {
+            discordNotification(Embed.builder()
+                .title("Error")
+                .description("Not enough disk space remaining to continue replay recording")
+                .errorColor()
+            );
+            disable();
+            return;
+        }
         if (CONFIG.client.extra.replayMod.maxRecordingTimeMins <= 0) return;
         if (System.currentTimeMillis() - ((long) CONFIG.client.extra.replayMod.maxRecordingTimeMins * 60 * 1000) > startT) {
             info("Stopping recording due to max recording time");
@@ -139,6 +150,16 @@ public class ReplayMod extends Module {
     @Locked
     private void startRecording() {
         cancelDelayedRecordingStop();
+        replayDirectory.toFile().mkdirs();
+        if (replayDirectory.toFile().exists() && replayDirectory.toFile().getUsableSpace() < minFreeSpaceBytes) {
+            discordNotification(Embed.builder()
+                .title("Error")
+                .description("Not enough disk space remaining to start replay recording")
+                .errorColor()
+            );
+            disable();
+            return;
+        }
         info("Starting recording");
         this.replayRecording = new ReplayRecording(replayDirectory);
         try {
@@ -160,7 +181,7 @@ public class ReplayMod extends Module {
             error("Failed to save recording", e);
         }
         var file = replayRecording.getReplayFile();
-        if (file.exists()) {
+        if (file != null && file.exists()) {
             info("Recording saved to {}", file.getPath());
             EVENT_BUS.postAsync(new ReplayStoppedEvent(replayRecording.getReplayFile()));
         } else {

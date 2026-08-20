@@ -85,6 +85,7 @@ public final class Bot extends ModuleUtils {
     );
     @Getter private boolean isSneaking;
     private boolean wasSneaking;
+    private boolean isSlowMovement;
     @Getter private boolean isSprinting;
     private boolean lastSprinting;
     private boolean isFlying;
@@ -94,6 +95,8 @@ public final class Bot extends ModuleUtils {
     @Getter private boolean isTouchingWater;
     @Getter private boolean isTouchingLava;
     private boolean wasJumpPressed = false;
+    private int jumpTriggerTime;
+    private int noJumpDelay;
     private boolean wasSneakPressed = false;
     private double waterHeight;
     private double lavaHeight;
@@ -115,7 +118,6 @@ public final class Bot extends ModuleUtils {
     private float flyingSpeed = 0.05f;
     private boolean onGroundNoBlocks = false;
     @Getter Optional<BlockPos> supportingBlockPos = Optional.empty();
-    private int jumpTriggerTime;
     @Getter private boolean horizontalCollision = false;
     private boolean horizontalCollisionMinor = false;
     @Getter private boolean verticalCollision = false;
@@ -134,17 +136,22 @@ public final class Bot extends ModuleUtils {
             of(ClientBotTick.class, POST_TICK_PRIORITY, this::postTick),
             of(ClientBotTick.Starting.class, this::handleClientTickStarting),
             of(ClientBotTick.Stopped.class, this::handleClientTickStopped),
-            of(ClientTickEvent.class, this::syncWhilePlayerControlling)
+            of(ClientTickEvent.class, this::tickWhilePlayerControlling)
         );
     }
 
-    private void syncWhilePlayerControlling(ClientTickEvent event) {
+    private void tickWhilePlayerControlling(ClientTickEvent event) {
         if (!Proxy.getInstance().hasActivePlayer()) return;
-        syncFromCache(true);
+        syncFromCache(false);
         var currentPose = pose;
         updatePlayerPose();
         if (currentPose != pose) {
             SpectatorSync.sendPlayerPose();
+        }
+        for (var entity : CACHE.getEntityCache().getEntities().values()) {
+            if (!entity.isRemoved()) {
+                entity.setTickCount(entity.getTickCount() + 1);
+            }
         }
     }
 
@@ -272,15 +279,26 @@ public final class Bot extends ModuleUtils {
         }
     }
 
+    void onInteractionTickSkipped() {
+        interactions.stopDestroyBlock();
+        wasLeftClicking = false;
+    }
+
     private void tick(final ClientBotTick event) {
-        if (this.jumpTriggerTime > 0) --this.jumpTriggerTime;
-        if (!CACHE.getChunkCache().isChunkLoaded((int) x >> 4, (int) z >> 4)) return;
+        if (!CACHE.getChunkCache().isChunkLoaded((int) x >> 4, (int) z >> 4)) {
+            onInteractionTickSkipped();
+            return;
+        }
 
-        if (resyncTeleport()) return;
+        if (resyncTeleport()) {
+            onInteractionTickSkipped();
+            return;
+        }
 
-        if (CACHE.getPlayerCache().getThePlayer().isSleeping()) {
+        if (CACHE.getPlayerCache().getThePlayer().isSleeping() && CONFIG.debug.botAutoExitBed) {
             debug("Player sleeping, sending leave bed packet");
             sendClientPacketAwait(new ServerboundPlayerCommandPacket(CACHE.getPlayerCache().getEntityId(), PlayerState.LEAVE_BED));
+            onInteractionTickSkipped();
             return;
         }
 
@@ -300,6 +318,8 @@ public final class Bot extends ModuleUtils {
             }
         }
 
+        updateInWaterStateAndDoFluidPushing();
+
         if (Math.abs(velocity.getX()) < 0.003) velocity.setX(0);
         if (Math.abs(velocity.getY()) < 0.003) velocity.setY(0);
         if (Math.abs(velocity.getZ()) < 0.003) velocity.setZ(0);
@@ -310,10 +330,16 @@ public final class Bot extends ModuleUtils {
 
         updateFallFlying();
 
-        isSneaking = !isFlying
+        isSlowMovement = !isFlying
+            && !isSwimming
             && !CACHE.getPlayerCache().getThePlayer().isInVehicle()
             && canPlayerFitWithinBlocksAndEntitiesWhen(getCollisionBox(Pose.SNEAKING))
-            && (movementInput.sneaking || !CACHE.getPlayerCache().getThePlayer().isSleeping() && !canPlayerFitWithinBlocksAndEntitiesWhen(getCollisionBox(Pose.STANDING)));
+            && (wasSneaking || !CACHE.getPlayerCache().getThePlayer().isSleeping() && !canPlayerFitWithinBlocksAndEntitiesWhen(getCollisionBox(Pose.STANDING)))
+            || ((pose == Pose.SWIMMING || (!isFallFlying && pose == Pose.FALL_FLYING)) && !isTouchingWater);
+        if (CACHE.getPlayerCache().getThePlayer().isInVehicle()) {
+            isSlowMovement = false;
+        }
+        isSneaking = movementInput.sneaking;
         isSprinting = movementInput.sprinting
             && (lastSprinting || isOnGround())
             && (lastSprinting || !CACHE.getPlayerCache().getThePlayer().getPotionEffectMap().containsKey(Effect.BLINDNESS))
@@ -322,7 +348,13 @@ public final class Bot extends ModuleUtils {
             && !(horizontalCollision && !horizontalCollisionMinor);
         if (isSprinting != lastSprinting) applySprintingSpeedAttributeModifier();
 
-        updateInWaterStateAndDoFluidPushing();
+        var selfDimensions = getEntityDimensions(pose);
+        var bbWidth = selfDimensions.getWidth();
+        moveTowardsClosestSpace(getX() - bbWidth * 0.35, getZ() + bbWidth * 0.35);
+        moveTowardsClosestSpace(getX() - bbWidth * 0.35, getZ() - bbWidth * 0.35);
+        moveTowardsClosestSpace(getX() + bbWidth * 0.35, getZ() - bbWidth * 0.35);
+        moveTowardsClosestSpace(getX() + bbWidth * 0.35, getZ() + bbWidth * 0.35);
+
         updateSwimming();
         boolean didUpdateFlyState = false;
         if (CACHE.getPlayerCache().isCanFly()) { // creative flight
@@ -369,15 +401,15 @@ public final class Bot extends ModuleUtils {
         }
 
         if (movementInput.isJumping()) {
-            if (this.onGround && jumpTriggerTime == 0 && (!isTouchingWater && !isTouchingLava)) {
+            if (this.onGround && this.noJumpDelay == 0 && (!isTouchingWater && !isTouchingLava)) {
                 jump();
-                jumpTriggerTime = 10;
+                this.noJumpDelay = 10;
             } else if (isTouchingWater || isTouchingLava) {
                 this.velocity.setY(this.velocity.getY() + 0.04F);
             }
             // todo: lava swimming
             // todo: full jump when at water surface
-        } else jumpTriggerTime = 0;
+        } else this.noJumpDelay = 0;
 
         final MutableVec3d movementInputVec = getMovementInputVec();
         if (isTouchingWater && isSneaking && !isFlying) velocity.setY(velocity.getY() - 0.04f);
@@ -391,6 +423,8 @@ public final class Bot extends ModuleUtils {
             playerTravel(movementInputVec);
             tryCheckInsideBlocks();
         }
+        if (this.jumpTriggerTime > 0) --this.jumpTriggerTime;
+        if (this.noJumpDelay > 0) --this.noJumpDelay;
 
         if (onGround && isFlying && CACHE.getPlayerCache().getGameMode() != GameMode.SPECTATOR) {
             isFlying = false;
@@ -490,6 +524,9 @@ public final class Bot extends ModuleUtils {
 
     private void tickEntities() {
         for (var entity : CACHE.getEntityCache().getEntities().values()) {
+            if (!entity.isRemoved()) {
+                entity.setTickCount(entity.getTickCount() + 1);
+            }
             if (entity == CACHE.getPlayerCache().getThePlayer()) continue;
             switch (entity.getEntityType()) {
                 case FIREWORK_ROCKET -> {
@@ -591,20 +628,20 @@ public final class Bot extends ModuleUtils {
 
     private MutableVec3d getMovementInputVec() {
         float strafe = 0.0F;
-        if (movementInput.pressingLeft) --strafe;
-        if (movementInput.pressingRight) ++strafe;
+        if (movementInput.pressingLeft) ++strafe;
+        if (movementInput.pressingRight) --strafe;
         // todo:
 //        if (isUsingItem && !isPassenger) {
 //            this.input.leftImpulse *= 0.2F;
 //            this.input.forwardImpulse *= 0.2F;
 //            this.sprintTriggerTime = 0;
 //        }
-        if (movementInput.sneaking) strafe *= sneakSpeed;
+        if (isSlowMovement) strafe *= sneakSpeed;
         strafe = strafe * 0.98f;
         float fwd = 0.0F;
         if (movementInput.pressingForward) ++fwd;
         if (movementInput.pressingBack) --fwd;
-        if (movementInput.sneaking) fwd *= sneakSpeed;
+        if (isSlowMovement) fwd *= sneakSpeed;
         fwd = fwd * 0.98f;
         return new MutableVec3d(strafe, 0, fwd);
     }
@@ -640,7 +677,7 @@ public final class Bot extends ModuleUtils {
 
     public void handlePlayerPosRotate(final int teleportId) {
         syncFromCache(true);
-        CLIENT_LOG.info("Server teleport {} to: {}, {}, {}d", teleportId, this.x, this.y, this.z);
+        CLIENT_LOG.info("Server teleport {} to: {}, {}, {}", teleportId, String.format("%.8f", this.x), String.format("%.8f", this.y), String.format("%.8f", this.z));
         sendClientPacketAwait(new ServerboundAcceptTeleportationPacket(teleportId));
         sendClientPacketAwait(new ServerboundMovePlayerPosRotPacket(false, false, this.x, this.y, this.z, this.yaw, this.pitch));
         CLIENT_LOG.debug("Accepted teleport: {}", teleportId);
@@ -776,8 +813,8 @@ public final class Bot extends ModuleUtils {
 
     private void travelInAir(MutableVec3d movementInputVec) {
         final Block floorBlock = World.getBlock(getVelocityAffectingPos());
-        float floorSlipperiness = floorBlock.friction();
-        float friction = this.onGround ? floorSlipperiness * 0.91f : 0.91F;
+        float floorSlipperiness = this.onGround ? floorBlock.friction() : 1.0f;
+        float friction = floorSlipperiness * 0.91f;
         applyMovementInput(movementInputVec, floorSlipperiness);
         if (!isFlying) velocity.setY(velocity.getY() - gravity);
         velocity.multiply(friction, 0.9800000190734863, friction);
@@ -807,7 +844,7 @@ public final class Bot extends ModuleUtils {
     }
 
     private MutableVec3d collide(MutableVec3d movement) {
-        List<LocalizedCollisionBox> blockCollisionBoxes = World.getIntersectingCollisionBoxes(
+        List<LocalizedCollisionBox> blockCollisionBoxes = getCollidingCbsWithMojank(
             playerCollisionBox.stretch(movement.getX(), movement.getY(), movement.getZ()));
         MutableVec3d adjustedMovement = collidePlayerBoundingBox(movement, playerCollisionBox, blockCollisionBoxes);
         boolean isYAdjusted = movement.getY() != adjustedMovement.getY();
@@ -821,7 +858,7 @@ public final class Bot extends ModuleUtils {
                 stepUpXZCb = stepUpXZCb.stretch(0, -1.0E-5, 0);
             }
 
-            blockCollisionBoxes.addAll(World.getIntersectingCollisionBoxes(stepUpXZCb));
+            blockCollisionBoxes.addAll(getCollidingCbsWithMojank(stepUpXZCb));
             double[] stepUpHeights = collectCandidateStepUpHeights(playerCB, blockCollisionBoxes, adjustedMovement.getY(), stepHeight);
 
             for (double stepUpHeight : stepUpHeights) {
@@ -912,7 +949,8 @@ public final class Bot extends ModuleUtils {
     }
 
     private void tryCheckInsideBlocks() {
-        var collidingBlockStates = World.getCollidingBlockStatesInside(playerCollisionBox);
+        // blockstates we're checking don't all have collision boxes, so no intersect check
+        var collidingBlockStates = World.getBlockStatesInside(playerCollisionBox);
         if (collidingBlockStates.isEmpty()) return;
         for (int i = 0; i < collidingBlockStates.size(); i++) {
             var localState = collidingBlockStates.get(i);
@@ -1127,6 +1165,7 @@ public final class Bot extends ModuleUtils {
     }
 
     private void tickEntityPushing() {
+        if (!CONFIG.debug.entityPushing) return;
         if (CACHE.getPlayerCache().getGameMode() == GameMode.SPECTATOR) return;
         var selfTeam = CACHE.getTeamCache().getTeamsByPlayer().get(CACHE.getProfileCache().getProfile().getName());
         var selfCollisionRule = selfTeam == null ? CollisionRule.ALWAYS : selfTeam.getCollisionRule();
@@ -1261,7 +1300,15 @@ public final class Bot extends ModuleUtils {
     }
 
     private float getMovementSpeed(float slipperiness) {
-        return this.onGround ? this.speed * (0.21600002f / (slipperiness * slipperiness * slipperiness)) : 0.02f;
+        return this.onGround ? this.speed * (0.21600002f / (slipperiness * slipperiness * slipperiness)) : getPlayerFlyingSpeed();
+    }
+
+    private float getPlayerFlyingSpeed() {
+        if (isFlying && !CACHE.getPlayerCache().getThePlayer().isInVehicle()) {
+            return isSprinting() ? this.flyingSpeed * 2.0f : this.flyingSpeed;
+        } else {
+            return this.isSprinting() ? 0.025999999F : 0.02F;
+        }
     }
 
     private float getBlockSpeedFactor() {
@@ -1296,9 +1343,9 @@ public final class Bot extends ModuleUtils {
     }
 
     public void syncFromCache(boolean full) {
-        this.x = this.lastX = CACHE.getPlayerCache().getX();
-        this.y = this.lastY = CACHE.getPlayerCache().getY();
-        this.z = this.lastZ = CACHE.getPlayerCache().getZ();
+        this.x = CACHE.getPlayerCache().getX();
+        this.y = CACHE.getPlayerCache().getY();
+        this.z = CACHE.getPlayerCache().getZ();
         this.yaw = this.lastYaw = this.requestedYaw = CACHE.getPlayerCache().getYaw();
         this.pitch = this.lastPitch = this.requestedPitch = CACHE.getPlayerCache().getPitch();
         this.onGround = this.lastOnGround = true; // todo: cache
@@ -1308,12 +1355,11 @@ public final class Bot extends ModuleUtils {
         this.velocity.set(0, 0, 0);
         this.supportingBlockPos = Optional.empty();
         this.onGroundNoBlocks = false;
-        this.ticksSinceLastPositionPacketSent = 0;
         if (full) {
-            this.isSneaking = this.wasSneaking = false;
+            this.isSneaking = this.wasSneaking = isSlowMovement = false;
             this.isSprinting = this.lastSprinting = false;
         } else {
-            this.isSneaking = this.wasSneaking = CACHE.getPlayerCache().isSneaking();
+            this.isSneaking = this.wasSneaking = isSlowMovement = CACHE.getPlayerCache().isSneaking();
             this.isSprinting = this.lastSprinting = CACHE.getPlayerCache().isSprinting();
         }
         this.isSwimming = CACHE.getPlayerCache().getThePlayer().isSwimming();
@@ -1376,11 +1422,15 @@ public final class Bot extends ModuleUtils {
                     var fluidState = World.getFluidState(blockState.id());
                     if (fluidState == null) continue;
                     if (waterFluid) {
-                        if (!World.isWater(blockState.block())) continue;
+                        if (!fluidState.water()) {
+                            continue;
+                        }
                     } else {
-                        if (blockState.block() != BlockRegistry.LAVA) continue;
+                        if (!fluidState.lava()) {
+                            continue;
+                        }
                     }
-                    float fluidHeight = World.getFluidHeight(fluidState);
+                    float fluidHeight = World.getFluidHeight(fluidState, x, y, z);
                     if (fluidHeight == 0 || (fluidHeightToWorld = y + fluidHeight) < playerCollisionBox.minY() + 0.001) continue;
                     touched = true;
                     topFluidHDelta = Math.max(fluidHeightToWorld - (playerCollisionBox.minY() + 0.001), topFluidHDelta);
@@ -1404,6 +1454,10 @@ public final class Bot extends ModuleUtils {
                 pushVec.normalize();
             }
             pushVec.multiply(motionScale);
+            if (Math.abs(velocity.getX()) < 0.003 && Math.abs(velocity.getZ()) < 0.003 && pushVec.length() < 0.0045000000000000005) {
+                pushVec.normalize();
+                pushVec.multiply(0.0045000000000000005);
+            }
             velocity.add(pushVec);
         }
         if (waterFluid) {
@@ -1432,6 +1486,57 @@ public final class Bot extends ModuleUtils {
             }
         }
         return false;
+    }
+
+    private void moveTowardsClosestSpace(double x, double z) {
+        int posX = MathHelper.floorI(x);
+        int posY = MathHelper.floorI(getY());
+        int posZ = MathHelper.floorI(z);
+        if (!suffocatesAt(posX, posY, posZ)) return;
+        Direction resultDir = null;
+        var minAxisOff = Double.MAX_VALUE;
+        var directions = new Direction[]{Direction.WEST, Direction.EAST, Direction.NORTH, Direction.SOUTH};
+        for (var dir : directions) {
+            double axisDir = dir.getAxis().choose(x - posX, 0, z - posZ);
+            double axisOff = dir.getAxisDirection() == Direction.AxisDirection.POSITIVE ? 1.0 - axisDir : axisDir;
+            if (axisOff < minAxisOff && !suffocatesAt(posX + dir.getNormal().getX(), posY + dir.getNormal().getY(), posZ + dir.getNormal().getZ())) {
+                minAxisOff = axisOff;
+                resultDir = dir;
+            }
+        }
+
+        if (resultDir != null) {
+            if (resultDir.getAxis() == Direction.Axis.X) {
+                this.velocity.setX(0.1 * resultDir.getNormal().getX());
+            } else {
+                this.velocity.setZ(0.1 * resultDir.getNormal().getZ());
+            }
+        }
+    }
+
+    private boolean suffocatesAt(int blockPosX, int blockPosY, int blockPosZ) {
+        var cb = new LocalizedCollisionBox(blockPosX, blockPosX + 1, playerCollisionBox.minY(), playerCollisionBox.maxY(), blockPosZ, blockPosZ + 1, blockPosX, blockPosY, blockPosZ)
+            .inflate(-1.0E-7, -1.0E-7, -1.0E-7);
+        var states = World.getCollidingBlockStatesInside(cb);
+        // todo: this is not correct, there's more state we don't have in the blockstate
+        // todo: extract all this logic from data generator, vanilla has a `isSuffocating` lambda property on blockstate
+        return states.stream().anyMatch(state -> {
+            if (state.block() == BlockRegistry.FARMLAND
+                || state.block() == BlockRegistry.SOUL_SAND
+                || state.block() == BlockRegistry.DIRT_PATH
+                || state.block() == BlockRegistry.MUD
+            ) {
+                return true;
+            }
+            return state.block() != BlockRegistry.COBWEB
+                && state.block() != BlockRegistry.BAMBOO_SAPLING
+                && state.block() != BlockRegistry.MANGROVE_ROOTS
+                && state.block() != BlockRegistry.MOVING_PISTON
+                && state.block() != BlockRegistry.COPPER_GRATE
+                && !state.block().blockTags().contains(BlockTags.LEAVES)
+                && !state.block().name().contains("glass")
+                && state.isSolidBlock() && state.isShapeFullBlock();
+        });
     }
 
     private boolean resyncTeleport() {
@@ -1527,15 +1632,42 @@ public final class Bot extends ModuleUtils {
     }
 
     private boolean canPlayerFitWithinBlocksAndEntitiesWhen(CollisionBox poseCb) {
-        var sneakingCb = new LocalizedCollisionBox(poseCb, x, y, z).inflate(-1.0E-7, -1.0E-7, -1.0E-7);
-        var levelCbs = World.getIntersectingCollisionBoxes(sneakingCb);
+        var localizedPoseCb = new LocalizedCollisionBox(poseCb, x, y, z).inflate(-1.0E-7, -1.0E-7, -1.0E-7);
+        var levelCbs = getCollidingCbsWithMojank(localizedPoseCb);
         for (int i = 0; i < levelCbs.size(); i++) {
             final var cb = levelCbs.get(i);
-            if (sneakingCb.intersects(cb)) {
+            if (localizedPoseCb.intersects(cb)) {
                 return false;
             }
         }
         return true;
+    }
+
+    // todo: more general and less hacky solution
+    //  needs api in cb accessor with entity collider context
+    List<LocalizedCollisionBox> getCollidingCbsWithMojank(LocalizedCollisionBox playerCb) {
+        var levelCbs = World.getIntersectingCollisionBoxes(playerCb);
+        var collidingBlockStates = World.getCollidingBlockStatesInside(playerCb);
+        for (var bs : collidingBlockStates) {
+            if (bs.block() == BlockRegistry.SCAFFOLDING) {
+                var defaultScaffoldCbs = bs.getLocalizedCollisionBoxes();
+                if (getY() > bs.y() + 1 - 1.0E-5 && !movementInput.sneaking) {
+                    // keep solid cbs
+                } else {
+                    var distProp = bs.getProperty(BlockStateProperties.STABILITY_DISTANCE);
+                    var bottomProp = bs.getProperty(BlockStateProperties.BOTTOM);
+                    levelCbs.removeAll(defaultScaffoldCbs);
+                    if (distProp != null && bottomProp != null && distProp != 0 && bottomProp && getY() > bs.y() - 1.0E-5) {
+                        var unstableBottomCb = new LocalizedCollisionBox(new CollisionBox(0, 1, 0, 0.125, 0, 1), bs.x(), bs.y(), bs.z());
+                        levelCbs.add(unstableBottomCb);
+                        // replaced cbs
+                    } else {
+                        // no cbs, removed above
+                    }
+                }
+            }
+        }
+        return levelCbs;
     }
 
     private void rideTick() {
@@ -1553,6 +1685,7 @@ public final class Bot extends ModuleUtils {
         x = vehicle.getX();
         y = vehicleAttachY - playerAttachY;
         z = vehicle.getZ();
+        CACHE.getPlayerCache().getThePlayer().setX(x).setY(y).setZ(z);
     }
 
     public void onUpdateAbilities() {
@@ -1606,6 +1739,8 @@ public final class Bot extends ModuleUtils {
                 pose2 = Pose.SWIMMING;
             }
             this.pose = pose2;
+            var metadata = MetadataTypes.POSE.getMetadataFactory().create(6, MetadataTypes.POSE, pose2);
+            CACHE.getPlayerCache().getThePlayer().getMetadata().put(6, metadata);
         }
     }
 

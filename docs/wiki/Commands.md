@@ -192,6 +192,8 @@ If this still fails, try one of the alternate auth types.
 
   ```auth clear```
 
+  ```auth refreshNow```
+
   ```auth attempts <int>```
 
   ```auth alwaysRefreshOnLogin on/off```
@@ -230,6 +232,8 @@ When an update is found, it will be applied 30 seconds after the next disconnect
 **Usage**
 
   ```autoUpdate on/off```
+
+  ```autoUpdate launcher on/off```
 
 
 ### chatRelay
@@ -325,7 +329,7 @@ You can configure different schemas for different servers based on the server ad
 
 
 
-Server address is without port, e.g. `connect.2b2t.org` or `192.168.0.5`
+Server address is without port, e.g. `2b2t.org` or `192.168.0.5`
 
 **Usage**
 
@@ -396,11 +400,11 @@ Configures ZenithProxy command prefixes and settings.
 
 ### database
 
-Configures the database module used for https://api.2b2t.vc
+Configures the database module used by https://api.2b2t.vc
 
 
 
-This is disabled by default. No ZenithProxy users contribute or collect data, this is purely for use with my own accounts.
+This is disabled by default - no ZenithProxy users contribute or collect data
 
 **Aliases:** `db`
 
@@ -455,14 +459,6 @@ Debug settings for features in testing or for use in development.
 
   ```debug clearEffects```
 
-  ```debug packetLog on/off```
-
-  ```debug packetLog client on/off```
-
-  ```debug packetLog server on/off```
-
-  ```debug packetLog filter <string>```
-
   ```debug kickDisconnect on/off```
 
   ```debug dc```
@@ -516,6 +512,8 @@ The relay is configured using the `chatRelay` command
 
   ```discord ignoreOtherBots on/off```
 
+  ```discord ignoreWebhooks on/off```
+
 
 ### displayCoords
 
@@ -565,7 +563,7 @@ The default `-Xmx` used by the launcher depends on the `java` or `linux` release
 
 * `java`: 300M
 
-* `linux`: 200M
+* `linux`: 225M
 
 
 
@@ -656,6 +654,8 @@ The release channel is a combination of a platform (java or linux) and a Minecra
   ```channel list```
 
   ```channel set <platform> <minecraft version>```
+
+  ```channel set <platform> <minecraft version> pre```
 
 
 ### server
@@ -885,6 +885,10 @@ All subcommands are only usable from the terminal.
 
   ```unsupported auth offlineUsername <username>```
 
+  ```unsupported auth offlineUUID <uuid>```
+
+  ```unsupported auth offlineUUID clear```
+
 
 
 ## Info Commands
@@ -962,6 +966,8 @@ Configures various discord notifications regarding player and proxy connections,
 
   ```discordNotifications mcVersionMismatchWarning on/off```
 
+  ```discordNotifications prio mention on/off```
+
 
 ### inventory
 
@@ -1034,6 +1040,49 @@ Generated maps cannot be larger than what chunks are currently cached in the pro
   ```map generate <viewDistance>```
 
 
+### packetLog
+
+Logs packets that are sent/received. Requires account owner permissions.
+
+
+
+`client` -> packets between Zenith and destination MC server
+
+`server` -> packets between players and Zenith
+
+
+
+If a filter is set, only packets matching the filter will be logged.
+
+Filters are always lowercase, but matched case-insensitive.
+
+
+
+`logLevelDebug` -> toggles the logger level between INFO and DEBUG
+
+
+
+To enable the debug log: `debug debugLogs on`
+
+And to enable debug log in the terminal: `debug terminalDebugLogs on`
+
+**Usage**
+
+  ```packetLog on/off```
+
+  ```packetLog client on/off```
+
+  ```packetLog server on/off```
+
+  ```packetLog filter add/del <string>```
+
+  ```packetLog filter list```
+
+  ```packetLog filter clear```
+
+  ```packetLog logLevelDebug on/off```
+
+
 ### playtime
 
 Gets the playtime of a player on 2b2t using https://api.2b2t.vc/
@@ -1043,15 +1092,6 @@ Gets the playtime of a player on 2b2t using https://api.2b2t.vc/
 **Usage**
 
   ```playtime <playerName>```
-
-
-### prio
-
-Configure alerts for 2b2t priority queue status
-
-**Usage**
-
-  ```prio mentions on/off```
 
 
 ### queueStatus
@@ -1468,6 +1508,18 @@ Dropping can be configured based on modes:
 
 Automatically eats food when health or hunger is below a set threshold.
 
+
+
+Which foods to eat can be configured based on modes:
+
+
+
+   * `all`: any food
+
+   * `whitelist`: only added foods
+
+   * `blacklist`: any food not added
+
 **Usage**
 
   ```autoEat on/off```
@@ -1479,6 +1531,16 @@ Automatically eats food when health or hunger is below a set threshold.
   ```autoEat warning on/off```
 
   ```autoEat allowUnsafeFood on/off```
+
+  ```autoEat mode <all/whitelist/blacklist>```
+
+  ```autoEat add/del <food>```
+
+  ```autoEat addAll <food1>,<food2>,...```
+
+  ```autoEat list```
+
+  ```autoEat clear```
 
 
 ### autoFish
@@ -1621,6 +1683,10 @@ Simulates a click to the block or entity in front of you
 
   ```click right target <any/none/entity/block>```
 
+  ```click right useItem```
+
+  ```click right useItem <mainHand/offHand>```
+
   ```click right hold```
 
   ```click right hold <mainHand/offHand/alternate>```
@@ -1634,6 +1700,8 @@ Simulates a click to the block or entity in front of you
   ```click hold forceRotation on/off```
 
   ```click hold forceRotation <yaw> <pitch>```
+
+  ```click hold forceRotation sync```
 
   ```click hold sneak on/off```
 
@@ -1863,6 +1931,29 @@ Default module priorities may be changed between versions.
   ```modulePriority list```
 
 
+### multi
+
+Execute multiple commands one after another
+
+
+
+Each command is separated by a double comma: `,,`
+
+
+
+The contained commands do not have a prefix.
+
+
+
+Example: `multi friend add rfresh2,,say hello,,pearlLoader load rfresh2`
+
+**Aliases:** `x`
+
+**Usage**
+
+  ```multi <command1>,,<command2>...```
+
+
 ### pathfinder
 
 Baritone pathfinder
@@ -2049,6 +2140,8 @@ Note that many other modules can change the player's rotation after this command
 
 **Usage**
 
+  ```rotate```
+
   ```rotate <yaw> <pitch>```
 
   ```rotate yaw <yaw>```
@@ -2173,6 +2266,45 @@ To add messages in bulk, use the `addAll` subcommand. Each message is delimited 
   ```spammer del <index>```
 
 
+### spawnPatrol
+
+Patrols spawn and paths to any player it finds, killing them if you have kill aura enabled.
+
+**Usage**
+
+  ```spawnPatrol on/off```
+
+  ```spawnPatrol goal <x> <y> <z>```
+
+  ```spawnPatrol maxPatrolRange <blocks>```
+
+  ```spawnPatrol targetOnlyNakeds on/off```
+
+  ```spawnPatrol targetOnlyBedrock on/off```
+
+  ```spawnPatrol stickyTargeting on/off```
+
+  ```spawnPatrol targetAttackers on/off```
+
+  ```spawnPatrol nether on/off```
+
+  ```spawnPatrol stuckKill on/off```
+
+  ```spawnPatrol stuckKill seconds <seconds>```
+
+  ```spawnPatrol stuckKill minDist <blocks>```
+
+  ```spawnPatrol stuckKill antiStuck on/off```
+
+  ```spawnPatrol ignore add/del <player>```
+
+  ```spawnPatrol ignore addAll <player1,player2,...>```
+
+  ```spawnPatrol ignore clear```
+
+  ```spawnPatrol ignore list```
+
+
 ### swap
 
 Swaps the current controlling player to spectator mode.
@@ -2251,43 +2383,25 @@ Examples:
   ```tasks taskCommandExecutedNotification on/off```
 
 
-### spawnPatrol
+### tickRate
 
-Patrols spawn and paths to any player it finds, killing them if you have kill aura enabled.
+Modifies the client tick rate, as a multiple of the default rate (20 ticks per second)
+
+
+
+Example:
+
+
+
+* 1.0 would be 20 tps
+
+* 0.5 would slow down the tickrate to 10 tps
+
+* 2.0 would speed up the tickrate to 40 tps
 
 **Usage**
 
-  ```spawnPatrol on/off```
-
-  ```spawnPatrol goal <x> <y> <z>```
-
-  ```spawnPatrol maxPatrolRange <blocks>```
-
-  ```spawnPatrol targetOnlyNakeds on/off```
-
-  ```spawnPatrol targetOnlyBedrock on/off```
-
-  ```spawnPatrol stickyTargeting on/off```
-
-  ```spawnPatrol targetAttackers on/off```
-
-  ```spawnPatrol nether on/off```
-
-  ```spawnPatrol stuckKill on/off```
-
-  ```spawnPatrol stuckKill seconds <seconds>```
-
-  ```spawnPatrol stuckKill minDist <blocks>```
-
-  ```spawnPatrol stuckKill antiStuck on/off```
-
-  ```spawnPatrol ignore add/del <player>```
-
-  ```spawnPatrol ignore addAll <player1,player2,...>```
-
-  ```spawnPatrol ignore clear```
-
-  ```spawnPatrol ignore list```
+  ```tickRate <rate>```
 
 
 ### via

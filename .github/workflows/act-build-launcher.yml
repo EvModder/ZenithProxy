@@ -2,14 +2,14 @@ name: Build Launcher
 
 # Command:
 
-# act workflow_dispatch -W .github\workflows\act-build-launcher.yml --artifact-server-path build\artifacts
+# act workflow_dispatch -W .github/workflows/act-build-launcher.yml --artifact-server-path build/artifacts
 
 on:
   workflow_dispatch:
 
 env:
-  pyinstaller_version: "6.11.1"
-  UV_PYTHON: 3.12.8
+  UV_PYTHON: '3.14.7'
+  pyinstaller_version: "6.21.0"
 
 jobs:
   build-matrix:
@@ -26,7 +26,7 @@ jobs:
             sha1-command: 'sha1sum -b dist/launch | cut -d" " -f 1'
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install uv
         run: curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -71,9 +71,6 @@ jobs:
           if-no-files-found: error
 
   build-alpine:
-    env:
-      pyinstaller_version: "6.18.0"
-      UV_PYTHON: '3.14.2'
     runs-on: ${{ matrix.os }}
     container:
       image: ${{ matrix.image || '' }}
@@ -91,7 +88,7 @@ jobs:
         run: apk add zip bash build-base ca-certificates curl gcc git libc-dev libffi-dev libgcc make musl-dev openssl openssl-dev zlib-dev
 
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           persist-credentials: false
 
@@ -141,7 +138,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Create Python executable zip
         run: zip -j launcher-py.zip src/launcher/*.py
@@ -175,7 +172,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Create Python executable zip
         run: zip -j launcher-py.zip src/launcher/*.py
@@ -212,7 +209,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Download job artifacts
         uses: actions/download-artifact@v5

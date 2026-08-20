@@ -32,6 +32,7 @@ import net.dv8tion.jda.api.exceptions.PermissionException;
 import net.dv8tion.jda.api.hooks.SimpleEventBusListener;
 import net.dv8tion.jda.api.requests.ErrorResponse;
 import net.dv8tion.jda.api.requests.GatewayIntent;
+import net.dv8tion.jda.api.requests.RestConfig;
 import net.dv8tion.jda.api.utils.FileUpload;
 import net.dv8tion.jda.api.utils.ShutdownException;
 import net.dv8tion.jda.api.utils.messages.MessageCreateBuilder;
@@ -100,8 +101,7 @@ public class DiscordBot {
         }
         this.presenceUpdateFuture = EXECUTOR.scheduleWithFixedDelay(
             this::tickPresence, 0L,
-            51L,
-            // 15L, // discord rate limit
+            51L, // discord rate limit
             TimeUnit.SECONDS);
     }
 
@@ -148,6 +148,7 @@ public class DiscordBot {
                 CONFIG.discord.token,
                 asList(GatewayIntent.MESSAGE_CONTENT, GatewayIntent.GUILD_MESSAGES))
             .setActivity(Activity.customStatus("Disconnected"))
+            .setRestConfig(new RestConfig().setMaxQueuedRequestsPerBucket(CONFIG.discord.maxQueuedRequestsPerBucket))
             .setStatus(OnlineStatus.DO_NOT_DISTURB)
             .addEventListeners(new SimpleEventBusListener(jdaEventBus));
         this.jda = builder.build();
@@ -172,14 +173,21 @@ public class DiscordBot {
     }
 
     private void onMessageReceived(MessageReceivedEvent event) {
-        var member = event.getMember();
-        if (member == null) return;
-        if (member.getUser().isBot() && CONFIG.discord.ignoreOtherBots) return;
-        if (member.getId().equals(jda.getSelfUser().getId())) return;
+        var author = event.getAuthor();
+        if (author.getId().equals(jda.getSelfUser().getId())) return;
+        if (author.isBot()) {
+            if (event.isWebhookMessage()) {
+                if (CONFIG.discord.ignoreWebhooks) {
+                    return;
+                }
+            } else if (CONFIG.discord.ignoreOtherBots) {
+                return;
+            }
+        }
         if (CONFIG.discord.chatRelay.enable
             && !CONFIG.discord.chatRelay.channelId.isEmpty()
             && event.getMessage().getChannelId().equals(CONFIG.discord.chatRelay.channelId)
-            && !member.getId().equals(jda.getSelfUser().getId())) {
+            && !author.getId().equals(jda.getSelfUser().getId())) {
             EVENT_BUS.postAsync(new DiscordRelayChannelMessageReceivedEvent(event));
             return;
         }
@@ -192,11 +200,9 @@ public class DiscordBot {
     private void executeDiscordCommand(final DiscordMainChannelCommandReceivedEvent event) {
         try {
             var jdaEvent = event.event();
-            var member = event.member();
+            var author = event.event().getAuthor();
             var inputMessage = event.message().substring(CONFIG.discord.prefix.length());
-            var memberName = member.getUser().getName();
-            var memberId = member.getId();
-            DISCORD_LOG.info("{} ({}) executed discord command: {}", memberName, memberId, inputMessage);
+            DISCORD_LOG.info("{} ({}) executed discord command: {}", author.getName(), author.getId(), inputMessage);
             final CommandContext context = DiscordCommandContext.create(inputMessage, jdaEvent);
             COMMAND.execute(context);
             final MessageCreateData request = commandEmbedOutputToMessage(context);
@@ -279,7 +285,11 @@ public class DiscordBot {
     }
 
     public static String escape(String message) {
-        return message.replaceAll("_", "\\\\_");
+        return message.replace("_", "\\_").replace("*", "\\*").replace("`", "\\`");
+    }
+
+    public static String unescape(String message) {
+        return message.replace("\\_", "_").replace("\\*", "*").replace("\\`", "`");
     }
 
     void tickPresence() {

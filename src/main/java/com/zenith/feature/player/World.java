@@ -279,7 +279,31 @@ public class World {
         return blockStates;
     }
 
+    /**
+     * with collision box intersect check
+      */
     public List<BlockState> getCollidingBlockStatesInside(final LocalizedCollisionBox cb) {
+        final List<BlockState> blockStates = new ArrayList<>(4);
+        LongList blockPosList = getBlockPosLongListInCollisionBoxInside(cb);
+        for (int i = 0; i < blockPosList.size(); i++) {
+            var blockPos = blockPosList.getLong(i);
+            var blockState = getBlockState(blockPos);
+            if (blockState.block().isAir()) continue; // air
+            var blockStateCbs = blockState.getLocalizedCollisionBoxes();
+            for (int j = 0; j < blockStateCbs.size(); j++) {
+                if (blockStateCbs.get(j).intersects(cb)) {
+                    blockStates.add(blockState);
+                    break;
+                }
+            }
+        }
+        return blockStates;
+    }
+
+    /**
+     * no collision box clip check
+     */
+    public List<BlockState> getBlockStatesInside(final LocalizedCollisionBox cb) {
         final List<BlockState> blockStates = new ArrayList<>(4);
         LongList blockPosList = getBlockPosLongListInCollisionBoxInside(cb);
         for (int i = 0; i < blockPosList.size(); i++) {
@@ -335,7 +359,7 @@ public class World {
     public MutableVec3d getFluidFlow(BlockState localBlockState) {
         FluidState fluidState = getFluidState(localBlockState.id());
         if (fluidState == null) return new MutableVec3d(0, 0, 0);
-        float fluidHeight = getFluidHeight(fluidState);
+        float fluidHeight = getFluidHeight(fluidState, localBlockState.x(), localBlockState.y(), localBlockState.z());
         if (fluidHeight == 0) return new MutableVec3d(0, 0, 0);
         double flowX = 0;
         double flowZ = 0;
@@ -347,12 +371,12 @@ public class World {
             FluidState adjacentFluidState = getFluidState(adjacentBlockstateId);
             if (affectsFlow(fluidState, adjacentFluidState)) {
                 float fluidHDiffMult = 0.0F;
-                float offsetFluidHeight = getFluidHeight(adjacentFluidState);
+                float offsetFluidHeight = getFluidHeight(adjacentFluidState, x, y, z);
                 if (offsetFluidHeight == 0) {
                     if (!blocksMotion(getBlock(adjacentBlockstateId))) {
                         FluidState adjacentBelowFluidState = getFluidState(getBlockStateId(x, y - 1, z));
                         if (affectsFlow(fluidState, adjacentBelowFluidState)) {
-                            offsetFluidHeight = getFluidHeight(adjacentBelowFluidState);
+                            offsetFluidHeight = getFluidHeight(adjacentBelowFluidState, x, y - 1, z);
                             if (offsetFluidHeight > 0) {
                                 fluidHDiffMult = fluidHeight - (offsetFluidHeight - 0.8888889F);
                             }
@@ -389,8 +413,15 @@ public class World {
         return block != BlockRegistry.COBWEB && block != BlockRegistry.BAMBOO_SAPLING && block.solidBlock();
     }
 
-    public float getFluidHeight(final @Nullable FluidState fluidState) {
+    public float getFluidHeight(final @Nullable FluidState fluidState, int x, int y, int z) {
         if (fluidState == null) return 0;
+        if (!fluidState.source()) {
+            var above = World.getFluidState(x, y+1, z);
+            if (above != null && ((above.water() && fluidState.water()) || (above.lava() && fluidState.lava()))) {
+                return 1.0f;
+            }
+        }
+
         return fluidState.amount() / 9.0f;
     }
 

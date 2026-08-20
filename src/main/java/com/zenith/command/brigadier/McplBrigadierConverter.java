@@ -41,6 +41,9 @@ public class McplBrigadierConverter {
     }
 
     public static @Nullable CommandDispatcher<CommandContext> toBrigadier(CommandNode[] nodes) {
+        if (nodes.length == 0) {
+            return null;
+        }
         var rootNode = nodes[0];
         if (rootNode.getType() != CommandType.ROOT) {
             CLIENT_LOG.warn("Failed to convert command nodes to brigadier: First command node is not a root node");
@@ -178,6 +181,9 @@ public class McplBrigadierConverter {
                 continue;
             }
             var child = LiteralArgumentBuilder.<CommandContext>literal(childNode.getName());
+            if (childNode.isExecutable()) {
+                child.executes(c -> 0);
+            }
             for (var childChildIndex : childNode.getChildIndices()) {
                 var childChildNode = convertChildMcplNode(nodes, nodeMap, childChildIndex);
                 if (childChildNode != null) {

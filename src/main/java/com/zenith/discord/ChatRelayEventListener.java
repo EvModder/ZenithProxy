@@ -39,8 +39,6 @@ import static java.util.Objects.isNull;
 public class ChatRelayEventListener {
     public static final ChatRelayEventListener INSTANCE = new ChatRelayEventListener();
 
-    private ChatRelayEventListener() {}
-
     public void subscribeEvents() {
         EVENT_BUS.subscribe(
             this,
@@ -55,7 +53,7 @@ public class ChatRelayEventListener {
         );
     }
 
-    private void handleRelayInputMessage(DiscordRelayChannelMessageReceivedEvent event) {
+    void handleRelayInputMessage(DiscordRelayChannelMessageReceivedEvent event) {
         if (!CONFIG.discord.chatRelay.enable) return;
         if (!CONFIG.discord.chatRelay.sendMessages) return;
         if (!Proxy.getInstance().isConnected() || event.message().isEmpty()) return;
@@ -101,14 +99,14 @@ public class ChatRelayEventListener {
         DISCORD.lastRelayMessage = Optional.of(Instant.now());
     }
 
-    private String extractRelayEmbedSenderUsername(@Nullable final Color color, final String msgContent) {
+    String extractRelayEmbedSenderUsername(@Nullable final Color color, final String msgContent) {
         final String sender;
         if (color != null && color.equals(Color.MAGENTA)) {
             // extract whisper sender
-            sender = msgContent.split("\\*\\*")[1];
+            sender = msgContent.split("\\*\\*")[1].replace("\\", "");
         } else if (color != null && color.equals(Color.BLACK)) {
             // extract public chat sender
-            sender = msgContent.split("\\*\\*")[1].replace(":", "");
+            sender = msgContent.split("\\*\\*")[1].replace(":", "").replace("\\", "");
             // todo: we could support death messages here if we remove any bolded discord formatting and feed the message content into the parser
         } else {
             throw new RuntimeException("Unhandled message being replied to, aborting relay");
@@ -116,7 +114,7 @@ public class ChatRelayEventListener {
         return sender;
     }
 
-    private void handleWhisperChatEvent(WhisperChatEvent event) {
+    void handleWhisperChatEvent(WhisperChatEvent event) {
         if (!CONFIG.discord.chatRelay.whispers) return;
         if (!CONFIG.discord.chatRelay.enable || CONFIG.discord.chatRelay.channelId.isEmpty()) return;
         if (CONFIG.discord.chatRelay.ignoreQueue && Proxy.getInstance().isInQueue()) return;
@@ -133,14 +131,15 @@ public class ChatRelayEventListener {
                     }
                 }
             }
-            message = message.replace(event.sender().getName(), "**" + event.sender().getName() + "**");
+            message = escape(message);
+            message = message.replace(escape(event.sender().getName()), "**" + escape(event.sender().getName()) + "**");
             if (!event.sender().getName().equals(event.receiver().getName())) {
-                message = message.replace(event.receiver().getName(), "**" + event.receiver().getName() + "**");
+                message = message.replace(escape(event.receiver().getName()), "**" + escape(event.receiver().getName()) + "**");
             }
             UUID senderUUID = event.sender().getProfileId();
             final String avatarURL = Proxy.getInstance().getPlayerHeadURL(senderUUID).toString();
             var embed = Embed.builder()
-                .description(escape(message))
+                .description(message)
                 .footer("\u200b", avatarURL)
                 .color(Color.MAGENTA);
             if (ping.isEmpty()) {
@@ -153,7 +152,7 @@ public class ChatRelayEventListener {
         }
     }
 
-    private void handleSystemChatEvent(SystemChatEvent event) {
+    void handleSystemChatEvent(SystemChatEvent event) {
         if (!CONFIG.discord.chatRelay.serverMessages) return;
         if (!CONFIG.discord.chatRelay.enable || CONFIG.discord.chatRelay.channelId.isEmpty()) return;
         if (CONFIG.discord.chatRelay.ignoreQueue && Proxy.getInstance().isInQueue()) return;
@@ -171,7 +170,7 @@ public class ChatRelayEventListener {
         }
     }
 
-    private void handlePublicChatEvent(PublicChatEvent event) {
+    void handlePublicChatEvent(PublicChatEvent event) {
         if (!CONFIG.discord.chatRelay.publicChats) return;
         if (!CONFIG.discord.chatRelay.enable || CONFIG.discord.chatRelay.channelId.isEmpty()) return;
         if (CONFIG.discord.chatRelay.ignoreQueue && Proxy.getInstance().isInQueue()) return;
@@ -188,11 +187,11 @@ public class ChatRelayEventListener {
                     ping = notificationMention();
                 }
             }
-            message = "**" + event.sender().getName() + ":** " + message;
+            message = "**" + escape(event.sender().getName()) + ":** " + escape(message);
             UUID senderUUID = event.sender().getProfileId();
             final String avatarURL = Proxy.getInstance().getPlayerHeadURL(senderUUID).toString();
             var embed = Embed.builder()
-                .description(escape(message))
+                .description(message)
                 .footer("\u200b", avatarURL)
                 .color(color);
             if (ping.isEmpty()) {
@@ -207,9 +206,9 @@ public class ChatRelayEventListener {
 
     private static final Color PRIVATE_MESSAGE_EMBED_COLOR = Color.RED;
 
-    private void handlePrivateMessageSendEvent(final PrivateMessageSendEvent event) {
+    void handlePrivateMessageSendEvent(final PrivateMessageSendEvent event) {
         var embed = Embed.builder()
-            .description(escape("**" + event.getSenderName() + "**: " + event.getStringContents()))
+            .description("**" + escape(event.getSenderName()) + "**: " + escape(event.getStringContents()))
             .color(PRIVATE_MESSAGE_EMBED_COLOR);
         if (event.getSenderUUID() != null) {
             embed.footer("Private Message", Proxy.getInstance().getPlayerHeadURL(event.getSenderUUID()).toString());
@@ -219,7 +218,7 @@ public class ChatRelayEventListener {
         sendRelayEmbedMessage(embed);
     }
 
-    private void handleDeathMessageChatEvent(DeathMessageChatEvent event) {
+    void handleDeathMessageChatEvent(DeathMessageChatEvent event) {
         if (!CONFIG.discord.chatRelay.deathMessages) return;
         if (!CONFIG.discord.chatRelay.enable || CONFIG.discord.chatRelay.channelId.isEmpty()) return;
         if (CONFIG.discord.chatRelay.ignoreQueue && Proxy.getInstance().isInQueue()) return;
@@ -227,16 +226,17 @@ public class ChatRelayEventListener {
             String message = event.message();
             if (ignoreRegexFilter(message)) return;
             DeathMessageParseResult death = event.deathMessage();
-            message = message.replace(death.victim(), "**" + death.victim() + "**");
+            message = escape(message);
+            message = message.replace(escape(death.victim()), "**" + escape(death.victim()) + "**");
             var k = death.killer().filter(killer -> killer.type() == KillerType.PLAYER);
-            if (k.isPresent()) message = message.replace(k.get().name(), "**" + k.get().name() + "**");
+            if (k.isPresent()) message = message.replace(escape(k.get().name()), "**" + escape(k.get().name()) + "**");
             String senderName = death.victim();
             UUID senderUUID = CACHE.getTabListCache().getFromName(death.victim()).map(PlayerListEntry::getProfileId).orElse(null);
             final String avatarURL = senderUUID != null
                 ? Proxy.getInstance().getPlayerHeadURL(senderUUID).toString()
                 : Proxy.getInstance().getPlayerHeadURL(senderName).toString();
             var embed = Embed.builder()
-                .description(escape(message))
+                .description(message)
                 .footer("\u200b", avatarURL)
                 .color(Color.RUBY);
             sendRelayEmbedMessage(embed);
@@ -245,22 +245,22 @@ public class ChatRelayEventListener {
         }
     }
 
-    private void handleServerPlayerConnectedEvent(ServerPlayerConnectedEvent event) {
+    void handleServerPlayerConnectedEvent(ServerPlayerConnectedEvent event) {
         if (!CONFIG.discord.chatRelay.enable || !CONFIG.discord.chatRelay.connectionMessages || CONFIG.discord.chatRelay.channelId.isEmpty()) return;
         if (!Proxy.getInstance().isOnlineForAtLeastDuration(Duration.ofSeconds(3))) return;
         if (CONFIG.discord.chatRelay.ignoreQueue && Proxy.getInstance().isInQueue()) return;
         sendRelayEmbedMessage(Embed.builder()
-            .description(escape("**" + event.playerEntry().getName() + "** connected"))
+            .description("**" + escape(event.playerEntry().getName()) + "** connected")
             .successColor()
             .footer("\u200b", Proxy.getInstance().getPlayerHeadURL(event.playerEntry().getProfileId()).toString()));
     }
 
-    private void handleServerPlayerDisconnectedEvent(ServerPlayerDisconnectedEvent event) {
+    void handleServerPlayerDisconnectedEvent(ServerPlayerDisconnectedEvent event) {
         if (!CONFIG.discord.chatRelay.enable || !CONFIG.discord.chatRelay.connectionMessages || CONFIG.discord.chatRelay.channelId.isEmpty()) return;
         if (!Proxy.getInstance().isOnlineForAtLeastDuration(Duration.ofSeconds(3))) return;
         if (CONFIG.discord.chatRelay.ignoreQueue && Proxy.getInstance().isInQueue()) return;
         sendRelayEmbedMessage(Embed.builder()
-            .description(escape("**" + event.playerEntry().getName() + "** disconnected"))
+            .description("**" + escape(event.playerEntry().getName()) + "** disconnected")
             .errorColor()
             .footer("\u200b", Proxy.getInstance().getPlayerHeadURL(event.playerEntry().getProfileId()).toString()));
     }
@@ -269,7 +269,7 @@ public class ChatRelayEventListener {
         .expireAfterAccess(Duration.ofMinutes(1))
         .build();
 
-    private boolean ignoreRegexFilter(String contents) {
+    boolean ignoreRegexFilter(String contents) {
         for (int i = 0; i < CONFIG.discord.chatRelay.ignoreRegex.size(); i++) {
             var regex = CONFIG.discord.chatRelay.ignoreRegex.get(i);
             Pattern pattern;
@@ -288,7 +288,7 @@ public class ChatRelayEventListener {
         return false;
     }
 
-    private void sendPrivateMessage(String message, MessageReceivedEvent event) {
+    void sendPrivateMessage(String message, MessageReceivedEvent event) {
         EVENT_BUS.postAsync(new PrivateMessageSendEvent(
             event.getMessage().getAuthor().getName(),
             message));
