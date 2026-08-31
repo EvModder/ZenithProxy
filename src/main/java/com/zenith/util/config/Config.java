@@ -451,10 +451,14 @@ public final class Config {
             public static final class AutoOmen {
                 public @Nullable Integer priority = null;
                 public boolean enabled = false;
-                public boolean whileRaidActive = false;
-                public boolean whileOmenActive = false;
-                public int raidCooldownMs = 1000;
-                public int omenCooldownMs = 1000;
+                public boolean consumeFullOmenStack = true;
+                public Mode mode = Mode.EFFECT_AND_RAID_INACTIVE;
+                public int constantTicks = 2000;
+
+                public enum Mode {
+                    EFFECT_AND_RAID_INACTIVE,
+                    CONSTANT
+                }
             }
 
             public static final class Stalk {
@@ -517,6 +521,7 @@ public final class Config {
                 public enum AutoRecordMode {
                     NONE("off"),
                     PROXY_CONNECTED("proxyConnected"),
+                    ONLINE("online"),
                     PLAYER_CONNECTED("playerConnected"),
                     HEALTH("health");
                     private final String name;
@@ -795,9 +800,11 @@ public final class Config {
             public boolean allowSpectator = true;
             public String spectatorEntity = "cat";
             public boolean spectatorPublicChatEnabled = true;
+            public boolean chatSendsPrivateMessage = true;
             public boolean fullCommandsEnabled = true;
             public boolean fullCommandsAcceptSlashCommands = true;
             public boolean fullCommandsRequireRegularWhitelist = true;
+            public boolean fullCommandsServerCommands = true;
             public boolean playerCamOnJoin = false;
             public boolean whitelistEnabled = true;
             public ArrayList<PlayerEntry> whitelist = new ArrayList<>();
@@ -896,7 +903,6 @@ public final class Config {
     public static final class InteractiveTerminal {
         public boolean enable = true;
         public boolean logToDiscord = true;
-        public boolean allowDumbTerminal = true;
         public boolean alwaysOnCompletions = true;
     }
 

@@ -7,7 +7,7 @@ import com.zenith.event.chat.DeathMessageChatEvent;
 import com.zenith.event.chat.PublicChatEvent;
 import com.zenith.event.chat.SystemChatEvent;
 import com.zenith.event.chat.WhisperChatEvent;
-import com.zenith.event.message.DiscordRelayChannelMessageReceivedEvent;
+import com.zenith.event.discord.DiscordRelayChannelMessageReceivedEvent;
 import com.zenith.event.message.PrivateMessageSendEvent;
 import com.zenith.event.server.ServerPlayerConnectedEvent;
 import com.zenith.event.server.ServerPlayerDisconnectedEvent;
@@ -231,7 +231,9 @@ public class ChatRelayEventListener {
             var k = death.killer().filter(killer -> killer.type() == KillerType.PLAYER);
             if (k.isPresent()) message = message.replace(escape(k.get().name()), "**" + escape(k.get().name()) + "**");
             String senderName = death.victim();
-            UUID senderUUID = CACHE.getTabListCache().getFromName(death.victim()).map(PlayerListEntry::getProfileId).orElse(null);
+            UUID senderUUID = CACHE.getTabListCache().getFromName(death.victim())
+                .or(() -> CACHE.getTabListCache().getRecentlyRemovedPlayer(death.victim()))
+                .map(PlayerListEntry::getProfileId).orElse(null);
             final String avatarURL = senderUUID != null
                 ? Proxy.getInstance().getPlayerHeadURL(senderUUID).toString()
                 : Proxy.getInstance().getPlayerHeadURL(senderName).toString();
@@ -294,8 +296,8 @@ public class ChatRelayEventListener {
             message));
     }
 
-    public void sendRelayEmbedMessage(Embed embedCreateSpec) {
-        DISCORD.sendRelayEmbedMessage(embedCreateSpec);
+    public void sendRelayEmbedMessage(Embed embed) {
+        DISCORD.sendRelayEmbedMessage(embed);
     }
     public void sendRelayEmbedMessage(String message, Embed embed) {
         DISCORD.sendRelayEmbedMessage(message, embed);
