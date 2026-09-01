@@ -22,5 +22,6 @@ This is a fork by [EvModder](https://github.com/EvModder), adapted for my own pe
 
 - **Discord presence:** Shared bot descriptions, slower updates, fewer timestamps.
 - **Discord notifications:** Account labels, less spam, optional command logging.
+- **Periodic clicks:** Allows left/right click intervals above 100 ticks.
 
 To rfresh: Feel free to copy anything here you like, or DM for a PR.

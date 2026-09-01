@@ -143,7 +143,7 @@ public class ClickCommand extends Command {
                             .primaryColor();
                         return OK;
                     })
-                    .then(literal("interval").then(argument("interval", integer(0, 100)).executes(c -> {
+                    .then(literal("interval").then(argument("interval", integer(0)).executes(c -> {
                         CONFIG.client.extra.click.holdLeftClickInterval = getInteger(c, "interval");
                         c.getSource().getEmbed()
                             .title("Left Click Hold Interval Set")
@@ -298,7 +298,7 @@ public class ClickCommand extends Command {
                             .title("Right Click Hold (Alternate)")
                             .primaryColor();
                     }))
-                    .then(literal("interval").then(argument("ticks", time(0, 100)).executes(c -> {
+                    .then(literal("interval").then(argument("ticks", time(0)).executes(c -> {
                         CONFIG.client.extra.click.holdRightClickInterval = getInteger(c, "ticks");
                         c.getSource().getEmbed()
                             .title("Right Click Hold Interval Set")
