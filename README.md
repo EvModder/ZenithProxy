@@ -21,5 +21,6 @@ This is a fork by [EvModder](https://github.com/EvModder), adapted for my own pe
 ## Changes in this fork
 
 - **Discord presence:** Shared bot descriptions, slower updates, fewer timestamps.
+- **Discord notifications:** Account labels, less spam, optional command logging.
 
 To rfresh: Feel free to copy anything here you like, or DM for a PR.

@@ -401,6 +401,10 @@ Configures ZenithProxy command prefixes and settings.
 
   ```commandConfig ingame allowWhitelistedToUseAccountOwnerCommands on/off```
 
+  ```commandConfig ingame logToDiscord on/off```
+
+  ```commandConfig terminal logToDiscord on/off```
+
 
 ### database
 

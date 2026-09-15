@@ -1,6 +1,7 @@
 package com.zenith.module.impl;
 
 import com.github.rfresh2.EventConsumer;
+import com.zenith.Proxy;
 import com.zenith.event.module.QueueWarningEvent;
 import com.zenith.event.queue.QueuePositionUpdateEvent;
 import com.zenith.feature.queue.Queue;
@@ -26,6 +27,7 @@ public class QueueWarning extends Module {
     }
 
     private void onQueuePositionUpdate(QueuePositionUpdateEvent event) {
+        if (Proxy.getInstance().isPrio()) return;
         if (CONFIG.client.extra.queueWarning.warningPositions.contains(event.position())) {
             var mention = CONFIG.client.extra.queueWarning.mentionPositions.contains(event.position());
             warn("Queue Position: " + Queue.queuePositionStr());

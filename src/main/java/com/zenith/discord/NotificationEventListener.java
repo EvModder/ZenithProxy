@@ -7,7 +7,6 @@ import com.zenith.event.discord.NotificationSentEvent;
 import com.zenith.event.module.*;
 import com.zenith.event.player.*;
 import com.zenith.event.plugin.PluginLoadFailureEvent;
-import com.zenith.event.plugin.PluginLoadedEvent;
 import com.zenith.event.queue.QueueCompleteEvent;
 import com.zenith.event.queue.QueuePositionUpdateEvent;
 import com.zenith.event.queue.QueueStartEvent;
@@ -82,9 +81,9 @@ public class NotificationEventListener {
             of(UpdateStartEvent.class, this::handleUpdateStartEvent),
             of(ServerRestartingEvent.class, this::handleServerRestartingEvent),
             of(ClientLoginFailedEvent.class, this::handleProxyLoginFailedEvent),
-            of(ClientStartConnectEvent.class, this::handleStartConnectEvent),
+            // of(ClientStartConnectEvent.class, this::handleStartConnectEvent),
             of(PrioStatusUpdateEvent.class, this::handlePrioStatusUpdateEvent),
-            of(AutoReconnectEvent.class, this::handleAutoReconnectEvent),
+            // of(AutoReconnectEvent.class, this::handleAutoReconnectEvent),
             of(MsaDeviceCodeLoginEvent.class, this::handleMsaDeviceCodeLoginEvent),
             of(UpdateAvailableEvent.class, this::handleUpdateAvailableEvent),
             of(ReplayStartedEvent.class, this::handleReplayStartedEvent),
@@ -92,7 +91,6 @@ public class NotificationEventListener {
             of(PlayerTotemPopAlertEvent.class, this::handleTotemPopEvent),
             of(NoTotemsEvent.class, this::handleNoTotemsEvent),
             of(PluginLoadFailureEvent.class, this::handlePluginLoadFailure),
-            of(PluginLoadedEvent.class, this::handlePluginLoadedEvent),
             of(SpawnPatrolTargetAcquiredEvent.class, this::handleSpawnPatrolTargetAcquiredEvent),
             of(SpawnPatrolTargetKilledEvent.class, this::handleSpawnPatrolTargetKilledEvent),
             of(SessionTimeLimitWarningEvent.class, this::handleSessionTimeLimitEvent),
@@ -152,22 +150,24 @@ public class NotificationEventListener {
     }
 
     public void handleConnectEvent(ClientConnectEvent event) {
-        var embed = Embed.builder()
-            .title("Connected")
+        // TODO: config option
+        /*var embed = Embed.builder()
+            .title(CONFIG.authentication.username+" connected")
             .inQueueColor()
             .addField("Server", CONFIG.client.server.address, true)
-            .addField("Proxy IP", CONFIG.server.getProxyAddress(), false);
+            // .addField("Proxy IP", CONFIG.server.getProxyAddress(), false) // TODO: config option
+        ;
         if (CONFIG.discord.mentionRoleOnConnect) {
             sendEmbedMessage(notificationMention(), embed);
         } else {
             sendEmbedMessage(embed);
-        }
+        }*/
         updatePresence();
     }
 
     public void handlePlayerOnlineEvent(ClientOnlineEvent event) {
         var embedBuilder = Embed.builder()
-            .title("Online")
+            .title(CONFIG.authentication.username+" online")
             .successColor();
         event.queueWait()
             .ifPresent(duration -> embedBuilder.addField("Queue Duration", formatDuration(duration), true));
@@ -187,12 +187,13 @@ public class NotificationEventListener {
     }
 
     public void handleDisconnectEvent(ClientDisconnectEvent event) {
+        if(event.onlineDurationWithQueueSkip().toMinutes() < 3) return; //TODO: config option
         var category = DisconnectReasonInfo.getDisconnectCategory(event.reason());
         var embed = Embed.builder()
-            .title("Disconnected")
-            .addField("Reason", event.reason(), false)
-            .addField("Why?", category.getWikiURL(), false)
-            .addField("Category", category.toString(), false)
+            .title(CONFIG.authentication.username+" disconnected")
+            .addField(/*Server-given reason*/"Reason", event.reason(), false)
+            // .addField("Why?", category.getWikiURL(), false)//TODO: config option
+            // .addField("Category", category.toString(), false) //TODO: config option
             .addField("Online Duration", formatDuration(event.onlineDurationWithQueueSkip()), false)
             .errorColor();
         if (Proxy.getInstance().isOn2b2t()) {
@@ -208,7 +209,6 @@ public class NotificationEventListener {
                         } else if (event.wasInQueue() && event.queuePosition() <= 1) {
                             embed.description("""
                       You have likely been kicked due to being IP banned by 2b2t.
-
                       To check, try connecting and waiting through queue with the same account from a different IP.
                       """);
                         } else if (!event.wasInQueue()
@@ -218,7 +218,6 @@ public class NotificationEventListener {
                         ) {
                             embed.description("""
                         You have likely been kicked for reaching the non-prio session time limit.
-
                         2b2t kicks non-prio players after %s hours online.
                         """.formatted(MODULE.get(SessionTimeLimit.class).getSessionTimeLimit().toHours()));
                         } else if (!event.wasInQueue()
@@ -250,7 +249,7 @@ public class NotificationEventListener {
 
     public void handleQueueWarning(QueueWarningEvent event) {
         sendEmbedMessage((event.mention() ? notificationMention() : ""), Embed.builder()
-            .title("Queue Warning")
+            .title(CONFIG.authentication.username+" Queue Warning")
             .addField("Queue Position", "[" + Queue.queuePositionStr() + "]", false)
             .inQueueColor());
     }
@@ -277,10 +276,12 @@ public class NotificationEventListener {
 
     public void handleStartQueueEvent(QueueStartEvent event) {
         var embed = Embed.builder()
-            .title("Started Queuing")
+            .title(CONFIG.authentication.username+" started queuing")
             .inQueueColor()
             .addField("Regular Queue", Queue.getQueueStatus().regular(), true)
             .addField("Priority Queue", Queue.getQueueStatus().prio(), true);
+
+        if(!event.wasOnline()) return; // TODO: config option
         if (event.wasOnline()) {
             embed
                 .addField("Info", "Kicked to queue", false)
@@ -316,7 +317,7 @@ public class NotificationEventListener {
 
     public void handleHealthAutoDisconnectEvent(HealthAutoDisconnectEvent event) {
         var embed = Embed.builder()
-            .title("Health AutoDisconnect Triggered")
+            .title(CONFIG.authentication.username+" Health AutoDisconnect Triggered")
             .addField("Health", CACHE.getPlayerCache().getThePlayer().getHealth(), true)
             .primaryColor();
         if (CONFIG.client.extra.utility.actions.autoDisconnect.mentionOnDisconnect) {
@@ -328,10 +329,16 @@ public class NotificationEventListener {
 
     public void handleProxyClientConnectedEvent(PlayerConnectedEvent event) {
         if (!CONFIG.discord.clientConnectionMessages) return;
+
+        //TODO: config setting to enable hiding connection msgs for friend-list/connection-list/other-list
+        if (PLAYER_LISTS.getFriendsList().contains(event.clientGameProfile())
+            && PLAYER_LISTS.getSpectatorWhitelist().contains(event.clientGameProfile())) return;
+
         var embed = Embed.builder()
-            .title("Client Connected")
-            .addField("Username", escape(event.clientGameProfile().getName()), false)
-            .addField("MC Version", event.session().getMCVersion(), false)
+            .title(event.clientGameProfile().getName()+" connected to "+CONFIG.authentication.username+"-Proxy")
+            // .title(CONFIG.authentication.username+"-Proxy connected")
+            // .addField("Username", escape(event.clientGameProfile().getName()), false)
+            // .addField("MC Version", event.session().getMCVersion(), false)//TODO: config field
             .thumbnail(Proxy.getInstance().getPlayerBodyURL(event.clientGameProfile().getId()).toString())
             .primaryColor();
         if (CONFIG.discord.mentionOnClientConnected) {
@@ -394,9 +401,10 @@ public class NotificationEventListener {
     public void handleProxySpectatorConnectedEvent(SpectatorConnectedEvent event) {
         if (!CONFIG.discord.clientConnectionMessages) return;
         var embed = Embed.builder()
-            .title("Spectator Connected")
-            .addField("Username", escape(event.clientGameProfile().getName()), false)
-            .addField("MC Version", event.session().getMCVersion(), false)
+            .title(event.clientGameProfile().getName()+" is spectating "+CONFIG.authentication.username+"-Proxy")
+            // .title("Spectator Connected")
+            // .addField("Username", escape(event.clientGameProfile().getName()), false)
+            // .addField("MC Version", event.session().getMCVersion(), false)
             .thumbnail(Proxy.getInstance().getPlayerBodyURL(event.clientGameProfile().getId()).toString())
             .primaryColor();
         if (CONFIG.discord.mentionOnSpectatorConnected) {
@@ -408,15 +416,22 @@ public class NotificationEventListener {
 
     public void handleProxyClientDisconnectedEvent(PlayerDisconnectedEvent event) {
         if (!CONFIG.discord.clientConnectionMessages) return;
+
+        //TODO: config setting to enable hiding connection msgs for friend-list/connection-list/other-list
+        if (PLAYER_LISTS.getFriendsList().contains(event.clientGameProfile())
+            && PLAYER_LISTS.getSpectatorWhitelist().contains(event.clientGameProfile())) return;
+
         var embed = Embed.builder()
-            .title("Client Disconnected")
+            .title(
+                (nonNull(event.clientGameProfile()) ? event.clientGameProfile().getName() : "null")+" disconnected from "+CONFIG.authentication.username+"-Proxy")
+            // .title(CONFIG.authentication.username+"-Proxy disconnected")
             .errorColor();
-        if (nonNull(event.clientGameProfile())) {
-            embed = embed.addField("Username", escape(event.clientGameProfile().getName()), false);
-        }
-        if (nonNull(event.reason())) {
-            embed = embed.addField("Reason", escape(event.reason()), false);
-        }
+        // if (nonNull(event.clientGameProfile())) {
+        //     embed = embed.addField("Username", escape(event.clientGameProfile().getName()), false);
+        // }
+        // if (nonNull(event.reason())) {//TODO: config option
+        //     embed = embed.addField("Reason", escape(event.reason()), false);
+        // }
         if (CONFIG.discord.mentionOnClientDisconnected) {
             sendEmbedMessage(notificationMention(), embed);
         } else {
@@ -425,8 +440,9 @@ public class NotificationEventListener {
     }
 
     public void handleVisualRangeEnterEvent(VisualRangeEnterEvent event) {
+        if(!Proxy.getInstance().getActiveConnections().isEmpty()) return;
         var embedCreateSpec = Embed.builder()
-            .title("Player In Visual Range")
+            .title("Player In Visual Range of "+CONFIG.authentication.username)
             .color(event.isFriend() ? CONFIG.theme.success.color() : CONFIG.theme.error.color())
             .addField("Player Name", escape(event.playerEntry().getName()), true)
             .addField("Player UUID", ("[" + event.playerEntry().getProfileId() + "](https://namemc.com/profile/" + event.playerEntry().getProfileId() + ")"), true)
@@ -474,8 +490,9 @@ public class NotificationEventListener {
     }
 
     public void handleVisualRangeLeaveEvent(final VisualRangeLeaveEvent event) {
+        if(!Proxy.getInstance().getActiveConnections().isEmpty()) return;
         var embedCreateSpec = Embed.builder()
-            .title("Player Left Visual Range")
+            .title("Player Left Visual Range of "+CONFIG.authentication.username)
             .color(event.isFriend() ? CONFIG.theme.success.color() : CONFIG.theme.error.color())
             .addField("Player Name", escape(event.playerEntry().getName()), true)
             .addField("Player UUID", ("[" + event.playerEntity().getUuid() + "](https://namemc.com/profile/" + event.playerEntry().getProfileId() + ")"), true)
@@ -492,6 +509,7 @@ public class NotificationEventListener {
     }
 
     public void handleVisualRangeLogoutEvent(final VisualRangeLogoutEvent event) {
+        if(!Proxy.getInstance().getActiveConnections().isEmpty()) return;
         var embedCreateSpec = Embed.builder()
             .title("Player Logout In Visual Range")
             .color(event.isFriend() ? CONFIG.theme.success.color() : CONFIG.theme.error.color())
@@ -830,19 +848,6 @@ public class NotificationEventListener {
             .description("Error: " + escape(event.message()))
             .addField("Plugin ID", escape(id), false)
             .addField("Plugin Jar", escape(event.jarPath().getFileName().toString()), false);
-        sendEmbedMessage(embed);
-    }
-
-    public void handlePluginLoadedEvent(PluginLoadedEvent event) {
-        var embed = Embed.builder()
-            .title("Plugin Loaded")
-            .successColor()
-            .addField("ID", escape(event.pluginInfo().id()), false)
-            .addField("Description", escape(event.pluginInfo().description()))
-            .addField("Version", escape(event.pluginInfo().version().toString()), false)
-            .addField("URL", escape(event.pluginInfo().url()), false)
-            .addField("Author(s)", String.join(", ", event.pluginInfo().authors()), false)
-            .addField("Mixins", event.pluginInfo().mixins().isEmpty() ? "no" : "yes");
         sendEmbedMessage(embed);
     }
 

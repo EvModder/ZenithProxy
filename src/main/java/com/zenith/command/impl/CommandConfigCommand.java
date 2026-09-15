@@ -30,10 +30,9 @@ public class CommandConfigCommand extends Command {
                 "ingame slashCommands replaceServerCommands on/off",
                 "ingame slashCommands suggestions on/off",
                 "ingame prefix <string>",
-                "ingame allowWhitelistedToUseAccountOwnerCommands on/off"
-                // todo: might add command to config these at some point. But I think these should always be on
-//                "ingame logToDiscord on/off",
-//                "terminal logToDiscord on/off"
+                "ingame allowWhitelistedToUseAccountOwnerCommands on/off",
+                "ingame logToDiscord on/off",
+                "terminal logToDiscord on/off"
             )
             .build();
     }
@@ -41,6 +40,11 @@ public class CommandConfigCommand extends Command {
     @Override
     public LiteralArgumentBuilder<CommandContext> register() {
         return command("commandConfig").requires(Command::validateAccountOwner)
+            .then(literal("terminal").then(literal("logToDiscord").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.interactiveTerminal.logToDiscord = getToggle(c, "toggle");
+                c.getSource().getEmbed()
+                    .title("Terminal Command Logging To Discord " + toggleStrCaps(CONFIG.interactiveTerminal.logToDiscord));
+            }))))
             .then(literal("discord").then(literal("prefix").then(argument("prefix", wordWithChars())
                 .executes(c -> {
                     final String newPrefix = c.getArgument("prefix", String.class);
@@ -98,6 +102,11 @@ public class CommandConfigCommand extends Command {
                     CONFIG.inGameCommands.allowWhitelistedToUseAccountOwnerCommands = getToggle(c, "toggle");
                     c.getSource().getEmbed()
                         .title("Allow Whitelisted Use Account Owner Commands " + toggleStrCaps(CONFIG.inGameCommands.allowWhitelistedToUseAccountOwnerCommands));
+                })))
+                .then(literal("logToDiscord").then(argument("toggle", toggle()).executes(c -> {
+                    CONFIG.inGameCommands.logToDiscord = getToggle(c, "toggle");
+                    c.getSource().getEmbed()
+                        .title("In Game Command Logging To Discord " + toggleStrCaps(CONFIG.inGameCommands.logToDiscord));
                 }))));
     }
 
@@ -112,12 +121,14 @@ public class CommandConfigCommand extends Command {
     public void defaultEmbed(final Embed builder) {
         builder
             .addField("Discord Prefix", CONFIG.discord.prefix)
+            .addField("Terminal Command Logging To Discord", toggleStr(CONFIG.interactiveTerminal.logToDiscord))
             .addField("Ingame Commands", toggleStr(CONFIG.inGameCommands.enable))
             .addField("Ingame Slash Commands", toggleStr(CONFIG.inGameCommands.slashCommands))
             .addField("Ingame Slash Commands Replace Server Commands", toggleStr(CONFIG.inGameCommands.slashCommandsReplacesServerCommands))
             .addField("Ingame Slash Command Suggestions", toggleStr(CONFIG.inGameCommands.slashCommands))
             .addField("Ingame Prefix", CONFIG.inGameCommands.prefix)
             .addField("Ingame Allow Whitelisted To Use Account Owner Commands", toggleStr(CONFIG.inGameCommands.allowWhitelistedToUseAccountOwnerCommands))
+            .addField("Ingame Command Logging To Discord", toggleStr(CONFIG.inGameCommands.logToDiscord))
             .primaryColor();
     }
 }
