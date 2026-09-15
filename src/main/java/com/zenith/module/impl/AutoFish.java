@@ -14,9 +14,9 @@ import com.zenith.feature.player.*;
 import com.zenith.mc.item.ItemRegistry;
 import com.zenith.network.codec.PacketHandlerCodec;
 import com.zenith.network.codec.PacketHandlerStateCodec;
-import com.zenith.util.math.MathHelper;
 import org.geysermc.mcprotocollib.protocol.data.ProtocolState;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.EquipmentSlot;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.MetadataTypes;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.object.ProjectileData;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.Hand;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType;
@@ -37,6 +37,10 @@ public class AutoFish extends AbstractInventoryModule {
     private int delay = 0;
     private Instant castTime = Instant.EPOCH;
     private int fishTimeoutCounter = 0;
+    private int soundBiteTicks = 0;
+    private int castPendingTicks = 0;
+    private int reelPendingTicks = 0;
+    private static final int CONFIRMATION_WAIT_TICKS = 100;
 
     public AutoFish() {
         super(HandRestriction.EITHER, 2);
@@ -88,40 +92,64 @@ public class AutoFish extends AbstractInventoryModule {
         delay = 0;
         castTime = Instant.EPOCH;
         fishTimeoutCounter = 0;
+        soundBiteTicks = 0;
+        castPendingTicks = 0;
+        reelPendingTicks = 0;
     }
 
     public void handleEntityFishHookSpawnEvent(final EntityFishHookSpawnEvent event) {
         try {
             if (event.getOwnerEntityId() != CACHE.getPlayerCache().getEntityId()) return;
             fishHookEntityId = event.fishHookObject().getEntityId();
+            soundBiteTicks = 0;
+            castPendingTicks = 0;
+            castTime = Instant.now();
         } catch (final Exception e) {
             error("Failed to handle EntityFishHookSpawnEvent", e);
         }
     }
 
-    public void handleSplashSoundEffectEvent(final SplashSoundEffectEvent event) {
-        if (!isFishing()) return;
-        var fishHookEntity = CACHE.getEntityCache().get(fishHookEntityId);
-        if (fishHookEntity == null) return;
-        if (MathHelper.manhattanDistance3d(
-            fishHookEntity.getX(), fishHookEntity.getY(), fishHookEntity.getZ(),
-            event.packet().getX(), event.packet().getY(), event.packet().getZ())
-            >= 1) return;
-        // reel in
-        requestUseRod(false).addInputExecutedListener(future -> {
-            if (future.getClickResult() instanceof ClickResult.RightClickResult rightClickResult) {
-                if (rightClickResult.getType() == ClickResult.RightClickResult.RightClickType.USE_ITEM) {
-                    fishHookEntityId = -1;
-                    delay = 20;
-                    fishTimeoutCounter = 0;
-                }
-            }
-        });
+    public void handleSplashSoundEffectEvent(SplashSoundEffectEvent event) {
+        var packet = event.packet();
+        if (isUnambiguousSplash(CACHE.getEntityCache().get(fishHookEntityId),
+            CACHE.getPlayerCache().getEntityId(), CACHE.getEntityCache().getEntities().values(),
+            packet.getX(), packet.getY(), packet.getZ())) {
+            soundBiteTicks = 10;
+        }
+    }
+
+    static boolean isUnambiguousSplash(Entity own, int ownerId, Iterable<? extends Entity> entities,
+                                       double x, double y, double z) {
+        if (!isOwnedHook(own, ownerId) || !matchesSplash(own, x, y, z)) return false;
+        for (Entity other : entities) {
+            if (other != own && other.getEntityType() == EntityType.FISHING_BOBBER
+                && matchesSplash(other, x, y, z)) return false;
+        }
+        return true;
+    }
+
+    private static boolean matchesSplash(Entity hook, double x, double y, double z) {
+        // Sound coordinates are quantized to 1/8 block; allow bobbing vertically,
+        // but keep horizontal tolerance narrow for adjacent fishing accounts.
+        return Math.abs(hook.getX() - x) <= 0.3 && Math.abs(hook.getZ() - z) <= 0.3
+            && Math.abs(hook.getY() - y) <= 1;
     }
 
     public void handleClientTick(final ClientBotTick event) {
+        if (waitForConfirmation(isFishing())) return;
+        boolean soundBite = soundBiteTicks > 0;
+        if (soundBite) soundBiteTicks--;
         if (delay > 0) {
             delay--;
+            return;
+        }
+        // Metadata is primary; a short-lived, unambiguous splash also works when
+        // servers strip or freeze the biting flag. Neither signal bypasses ownership.
+        if (isOwnedBitingHook(CACHE.getEntityCache().get(fishHookEntityId), CACHE.getPlayerCache().getEntityId())
+            || (soundBite && isFishing())) {
+            if (!switchToFishingRod() || !isRodInHand()) return;
+            int hookId = fishHookEntityId;
+            requestUseRod(false).addInputExecutedListener(future -> completeReel(future, hookId, false));
             return;
         }
         if (!isFishing()
@@ -131,24 +159,60 @@ public class AutoFish extends AbstractInventoryModule {
                 if (future.getClickResult() instanceof ClickResult.RightClickResult rightClickResult) {
                     if (rightClickResult.getType() == ClickResult.RightClickResult.RightClickType.USE_ITEM) {
                         castTime = Instant.now();
-                        delay = 5;
+                        castPendingTicks = CONFIRMATION_WAIT_TICKS;
                     }
                 }
             });
         }
         if (isFishing() && Instant.now().getEpochSecond() - castTime.getEpochSecond() > 60) {
-            // something's wrong, probably don't have hook in water
-            warn("Probably don't have hook in water. reeling in");
-            fishTimeoutCounter++;
-            if (fishTimeoutCounter > 0 && fishTimeoutCounter % 5 == 0) {
-                discordNotification(Embed.builder()
-                    .title("Warning")
-                    .description("Fishing timed out, probably don't have hook in water")
-                    .errorColor());
-            }
-            fishHookEntityId = -1;
-            requestUseRod(false);
+            if (!switchToFishingRod() || !isRodInHand()) return;
+            int hookId = fishHookEntityId;
+            requestUseRod(false).addInputExecutedListener(future -> {
+                if (completeReel(future, hookId, true)) {
+                    discordNotification(Embed.builder()
+                        .title("Warning")
+                        .description("Five consecutive fishing timeouts without a detected bite. Retrying automatically; check the fishing spot or server lag. Further warnings are suppressed until a bite is handled.")
+                        .errorColor());
+                }
+            });
         }
+    }
+
+    private boolean completeReel(InputRequestFuture future, int hookId, boolean timedOut) {
+        if (fishHookEntityId != hookId
+            || !(future.getClickResult() instanceof ClickResult.RightClickResult result)
+            || result.getType() != ClickResult.RightClickResult.RightClickType.USE_ITEM) return false;
+        // A sent use-item packet is not a server acknowledgement. Do not cast
+        // again until removal is observed; a delayed reel could otherwise toggle it back.
+        reelPendingTicks = CONFIRMATION_WAIT_TICKS;
+        soundBiteTicks = 0;
+        if (!timedOut) {
+            fishTimeoutCounter = 0;
+            return false;
+        }
+        if (fishTimeoutCounter >= 5) return false;
+        return ++fishTimeoutCounter == 5;
+    }
+
+    private boolean waitForConfirmation(boolean hookPresent) {
+        if (reelPendingTicks > 0) {
+            if (hookPresent) {
+                reelPendingTicks--;
+            } else {
+                reelPendingTicks = 0;
+                fishHookEntityId = -1;
+                delay = 20;
+            }
+            return true;
+        }
+        if (castPendingTicks > 0) {
+            if (hookPresent) castPendingTicks = 0;
+            else {
+                castPendingTicks--;
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean isRodInHand() {
@@ -185,9 +249,20 @@ public class AutoFish extends AbstractInventoryModule {
 
     private boolean isFishing() {
         final Entity cachedEntity = CACHE.getEntityCache().get(fishHookEntityId);
-        return cachedEntity instanceof EntityStandard standard
+        return isOwnedHook(cachedEntity, CACHE.getPlayerCache().getEntityId());
+    }
+
+    private static boolean isOwnedHook(Entity entity, int ownerId) {
+        return entity instanceof EntityStandard standard
             && standard.getEntityType() == EntityType.FISHING_BOBBER
-            && ((ProjectileData) standard.getObjectData()).getOwnerId() == CACHE.getPlayerCache().getEntityId();
+            && standard.getObjectData() instanceof ProjectileData projectile
+            && projectile.getOwnerId() == ownerId;
+    }
+
+    static boolean isOwnedBitingHook(Entity entity, int ownerId) {
+        // Minecraft 1.21.4 FishingHook.DATA_BITING (after hooked entity at index 8).
+        return isOwnedHook(entity, ownerId)
+            && Boolean.TRUE.equals(entity.getMetadataValue(9, MetadataTypes.BOOLEAN, Boolean.class));
     }
 
     @Override
