@@ -3,7 +3,6 @@ plugins {
     id("org.graalvm.buildtools.native") version "1.1.12"
     id("com.gradleup.shadow") version "9.6.1"
     id("io.freefair.lombok") version "9.5.0"
-    `maven-publish`
 }
 
 group = "com.zenith"
@@ -125,6 +124,11 @@ tasks {
     }
     test {
         useJUnitPlatform()
+        if (providers.gradleProperty("offlineTests").isPresent) {
+            // Explicit allowlist: other upstream tests can launch proxies or contact live services.
+            include("com/zenith/RotationRangeCheckTest.class", "com/zenith/discord/EmbedSerializerTest.class",
+                "com/zenith/module/impl/AutoFishTest.class")
+        }
         workingDir = layout.projectDirectory.dir("run").asFile
         forkEvery = 1 // needed bc zenith uses global static state
         maxParallelForks = Runtime.getRuntime().availableProcessors()
@@ -322,45 +326,4 @@ graalvmNative {
 
 shadow {
     addShadowVariantIntoJavaComponent = false
-}
-
-publishing {
-    repositories {
-        maven {
-            name = "releases"
-            url = uri("https://maven.2b2t.vc/releases")
-            credentials {
-                username = providers.environmentVariable("MAVEN_USERNAME").orNull
-                password = providers.environmentVariable("MAVEN_PASSWORD").orNull
-            }
-            authentication {
-                create<BasicAuthentication>("basic")
-            }
-        }
-        maven {
-            name = "snapshots"
-            url = uri("https://maven.2b2t.vc/snapshots")
-            credentials {
-                username = providers.environmentVariable("MAVEN_USERNAME").orNull
-                password = providers.environmentVariable("MAVEN_PASSWORD").orNull
-            }
-            authentication {
-                create<BasicAuthentication>("basic")
-            }
-        }
-    }
-    publications {
-        create<MavenPublication>("snapshot") {
-            groupId = "com.zenith"
-            artifactId = "ZenithProxy"
-            version = "${project.version}-SNAPSHOT"
-            from(components["java"])
-        }
-        create<MavenPublication>("release") {
-            groupId = "com.zenith"
-            artifactId = "ZenithProxy"
-            version = providers.environmentVariable("ZENITH_RELEASE_TAG").orElse("0.0.0+${project.version}").get()
-            from(components["java"])
-        }
-    }
 }

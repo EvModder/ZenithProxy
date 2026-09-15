@@ -29,8 +29,8 @@ def _valid_release_channel(channel: str) -> bool:
 class LaunchConfig:
 
     def __init__(self):
-        self.auto_update = True
-        self.auto_update_launcher = True
+        self.auto_update = False
+        self.auto_update_launcher = False
         self.release_channel = "java.1.21.4"
         self.version = "0.0.0"
         self.local_version = "0.0.0"

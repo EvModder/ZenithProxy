@@ -60,8 +60,8 @@ def setup_execute(config: LaunchConfig):
 
     minecraft_version = "1.21.4"
 
-    config.auto_update = True
-    config.auto_update_launcher = True
+    config.auto_update = False
+    config.auto_update_launcher = False
     config.release_channel = release_channel + "." + minecraft_version
     config.version = "0.0.0"
     config.local_version = "0.0.0"

@@ -1,5 +1,5 @@
 /.idea/*
-!/.idea/runConfigurations
+/work_files/
 *.iml
 /run/
 /log/

@@ -5,8 +5,8 @@ import org.jspecify.annotations.Nullable;
 
 @NullMarked
 public class LaunchConfig {
-    public boolean auto_update = true;
-    public boolean auto_update_launcher = true;
+    public boolean auto_update = false;
+    public boolean auto_update_launcher = false;
     public String release_channel = "java.1.21.4";
     public @Nullable String getMcVersion() {
         try {
