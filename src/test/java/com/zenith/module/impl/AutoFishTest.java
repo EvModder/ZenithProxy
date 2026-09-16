@@ -5,6 +5,7 @@ import com.zenith.feature.player.ClickResult;
 import com.zenith.feature.player.InputRequestFuture;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.MetadataTypes;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.type.BooleanEntityMetadata;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.type.IntEntityMetadata;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.object.ProjectileData;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.type.EntityType;
 import org.junit.jupiter.api.Test;
@@ -89,6 +90,97 @@ class AutoFishTest {
         var method = AutoFish.class.getDeclaredMethod("completeReel", InputRequestFuture.class, int.class, boolean.class);
         method.setAccessible(true);
         return (boolean) method.invoke(fish, future, hookId, timedOut);
+    }
+
+    @Test
+    void hookedEntityMetadataRequiresOwnership() {
+        var own = hook(100, false, 0);
+        own.getMetadata().clear();
+        own.getMetadata().put(8, new IntEntityMetadata(8, MetadataTypes.INT, 1081229201));
+        assertEquals(1081229200, AutoFish.hookedEntityId(own, 100));
+        assertEquals(-1, AutoFish.hookedEntityId(own, 101));
+    }
+
+    @Test
+    void missingOrInvalidHookedEntityMetadataIsUnknown() {
+        var own = hook(100, false, 0);
+        assertEquals(-1, AutoFish.hookedEntityId(own, 100));
+        assertEquals(-1, AutoFish.hookedEntityId(null, 100));
+        for (int encoded : new int[]{0, -1, Integer.MIN_VALUE}) {
+            own.getMetadata().put(8, new IntEntityMetadata(8, MetadataTypes.INT, encoded));
+            assertEquals(-1, AutoFish.hookedEntityId(own, 100));
+        }
+    }
+
+    @Test
+    void warningRemembersHookedLootUntilABiteWithoutChangingRecovery() throws Exception {
+        var cache = com.zenith.Globals.CACHE;
+        var own = hook(cache.getPlayerCache().getEntityId(), false, 0);
+        own.getMetadata().put(8, new IntEntityMetadata(8, MetadataTypes.INT, 44));
+        var item = new EntityStandard();
+        item.setEntityType(EntityType.ITEM);
+        var entities = cache.getEntityCache().getEntities();
+        var oldHook = entities.put(42, own);
+        var oldItem = entities.put(43, item);
+        try {
+            field("fishHookEntityId").setInt(fish, 42);
+            assertFalse(reel(false, true, 42));
+            assertFalse(field("hookedItemDuringTimeouts").getBoolean(fish));
+            assertFalse(reel(true, true, 42));
+            assertTrue(field("hookedItemDuringTimeouts").getBoolean(fish));
+            own.getMetadata().clear();
+            for (int i = 2; i <= 5; i++) assertEquals(i == 5, reel(true, true, 42));
+            assertTrue(field("hookedItemDuringTimeouts").getBoolean(fish));
+            assertEquals(100, field("reelPendingTicks").getInt(fish));
+            reel(true, false, 42);
+            assertFalse(field("hookedItemDuringTimeouts").getBoolean(fish));
+        } finally {
+            if (oldHook == null) entities.remove(42); else entities.put(42, oldHook);
+            if (oldItem == null) entities.remove(43); else entities.put(43, oldItem);
+        }
+    }
+
+    @Test
+    void hookedLootGetsTwoSentAttemptsThenWaitsForDetachment() throws Exception {
+        var cache = com.zenith.Globals.CACHE;
+        var own = hook(cache.getPlayerCache().getEntityId(), false, 0);
+        own.getMetadata().put(8, new IntEntityMetadata(8, MetadataTypes.INT, 44));
+        var item = new EntityStandard();
+        item.setEntityType(EntityType.ITEM);
+        var entities = cache.getEntityCache().getEntities();
+        var oldHook = entities.put(42, own);
+        var oldItem = entities.put(43, item);
+        try {
+            field("fishHookEntityId").setInt(fish, 42);
+            field("recoveryItemId").setInt(fish, 43);
+            var complete = AutoFish.class.getDeclaredMethod("completeItemReel", InputRequestFuture.class, int.class, int.class);
+            complete.setAccessible(true);
+            var future = new InputRequestFuture();
+            complete.invoke(fish, future, 42, 43);
+            assertEquals(0, field("itemRecoveryAttempts").getInt(fish));
+            future.setClickResult(ClickResult.RightClickResult.useItem());
+            complete.invoke(fish, future, 41, 43);
+            complete.invoke(fish, future, 42, 44);
+            assertEquals(0, field("itemRecoveryAttempts").getInt(fish));
+            complete.invoke(fish, future, 42, 43);
+            complete.invoke(fish, future, 42, 43);
+            complete.invoke(fish, future, 42, 43);
+            assertEquals(2, field("itemRecoveryAttempts").getInt(fish));
+            assertEquals(0, field("fishTimeoutCounter").getInt(fish));
+            field("itemWaitNotified").setBoolean(fish, true);
+            var handle = AutoFish.class.getDeclaredMethod("handleHookedItem");
+            handle.setAccessible(true);
+            for (int i = 0; i < 200; i++) assertEquals(true, handle.invoke(fish));
+            assertEquals(2, field("itemRecoveryAttempts").getInt(fish));
+            own.getMetadata().put(8, new IntEntityMetadata(8, MetadataTypes.INT, 0));
+            assertEquals(false, handle.invoke(fish));
+            own.getMetadata().put(8, new IntEntityMetadata(8, MetadataTypes.INT, 44));
+            entities.remove(43);
+            assertEquals(false, handle.invoke(fish));
+        } finally {
+            if (oldHook == null) entities.remove(42); else entities.put(42, oldHook);
+            if (oldItem == null) entities.remove(43); else entities.put(43, oldItem);
+        }
     }
 
     @Test

@@ -37,6 +37,10 @@ public class AutoFish extends AbstractInventoryModule {
     private int delay = 0;
     private Instant castTime = Instant.EPOCH;
     private int fishTimeoutCounter = 0;
+    private boolean hookedItemDuringTimeouts;
+    private int recoveryItemId = -1;
+    private int itemRecoveryAttempts;
+    private boolean itemWaitNotified;
     private int soundBiteTicks = 0;
     private int castPendingTicks = 0;
     private int reelPendingTicks = 0;
@@ -92,6 +96,10 @@ public class AutoFish extends AbstractInventoryModule {
         delay = 0;
         castTime = Instant.EPOCH;
         fishTimeoutCounter = 0;
+        hookedItemDuringTimeouts = false;
+        recoveryItemId = -1;
+        itemRecoveryAttempts = 0;
+        itemWaitNotified = false;
         soundBiteTicks = 0;
         castPendingTicks = 0;
         reelPendingTicks = 0;
@@ -143,6 +151,8 @@ public class AutoFish extends AbstractInventoryModule {
             delay--;
             return;
         }
+        if (!isFishing()) itemWaitNotified = false;
+        if (handleHookedItem()) return;
         // Metadata is primary; a short-lived, unambiguous splash also works when
         // servers strip or freeze the biting flag. Neither signal bypasses ownership.
         if (isOwnedBitingHook(CACHE.getEntityCache().get(fishHookEntityId), CACHE.getPlayerCache().getEntityId())
@@ -164,21 +174,68 @@ public class AutoFish extends AbstractInventoryModule {
                 }
             });
         }
-        if (isFishing() && Instant.now().getEpochSecond() - castTime.getEpochSecond() > 60) {
+        if (isFishing() && (itemWaitNotified || Instant.now().getEpochSecond() - castTime.getEpochSecond() > 60)) {
             if (!switchToFishingRod() || !isRodInHand()) return;
             int hookId = fishHookEntityId;
             requestUseRod(false).addInputExecutedListener(future -> {
                 if (completeReel(future, hookId, true)) {
-                    discordNotification(Embed.builder()
-                        .title("Warning")
-                        .description("Five consecutive fishing timeouts without a detected bite. Retrying automatically; check the fishing spot or server lag. Further warnings are suppressed until a bite is handled.")
-                        .errorColor());
+                    discordNotification(timeoutWarning());
                 }
             });
         }
     }
 
-    private boolean completeReel(InputRequestFuture future, int hookId, boolean timedOut) {
+    private boolean handleHookedItem() {
+        int targetId = hookedEntityId(CACHE.getEntityCache().get(fishHookEntityId), CACHE.getPlayerCache().getEntityId());
+        var target = CACHE.getEntityCache().get(targetId);
+        if (target == null || target.getEntityType() != EntityType.ITEM) return false;
+        if (targetId != recoveryItemId) {
+            recoveryItemId = targetId;
+            itemRecoveryAttempts = 0;
+            itemWaitNotified = false;
+        }
+        if (itemRecoveryAttempts >= 2) {
+            if (!itemWaitNotified) {
+                itemWaitNotified = true;
+                discordNotification(Embed.builder().title("Fishing obstructed")
+                    .description("The same dropped item is still hooked after two reel attempts. Waiting for it to detach or disappear; check the casting path.")
+                    .errorColor());
+            }
+            return true;
+        }
+        if (switchToFishingRod() && isRodInHand()) {
+            int hookId = fishHookEntityId;
+            requestUseRod(false).addInputExecutedListener(future -> completeItemReel(future, hookId, targetId));
+        }
+        return true;
+    }
+
+    private void completeItemReel(InputRequestFuture future, int hookId, int targetId) {
+        if (targetId == recoveryItemId && itemRecoveryAttempts < 2 && beginReel(future, hookId)) {
+            itemRecoveryAttempts++;
+            hookedItemDuringTimeouts = true;
+        }
+    }
+
+    private Embed timeoutWarning() {
+        return Embed.builder()
+            .title("Fishing recovery warning")
+            .description("Five timeout-recovery attempts without a detected bite. "
+                + (hookedItemDuringTimeouts
+                    ? "A dropped item was hooked during this streak; check item collection and the casting path. "
+                    : "Check the fishing spot or server lag. ")
+                + "Retrying automatically; further warnings are suppressed until a bite is handled.")
+            .errorColor();
+    }
+
+    static int hookedEntityId(Entity hook, int ownerId) {
+        if (!isOwnedHook(hook, ownerId)) return -1;
+        // Minecraft 1.21.4 DATA_HOOKED_ENTITY encodes the target ID plus one.
+        var encoded = hook.getMetadataValue(8, MetadataTypes.INT, Integer.class);
+        return encoded != null && encoded > 0 ? encoded - 1 : -1;
+    }
+
+    private boolean beginReel(InputRequestFuture future, int hookId) {
         if (fishHookEntityId != hookId
             || !(future.getClickResult() instanceof ClickResult.RightClickResult result)
             || result.getType() != ClickResult.RightClickResult.RightClickType.USE_ITEM) return false;
@@ -186,11 +243,21 @@ public class AutoFish extends AbstractInventoryModule {
         // again until removal is observed; a delayed reel could otherwise toggle it back.
         reelPendingTicks = CONFIRMATION_WAIT_TICKS;
         soundBiteTicks = 0;
+        itemWaitNotified = false;
+        return true;
+    }
+
+    private boolean completeReel(InputRequestFuture future, int hookId, boolean timedOut) {
+        if (!beginReel(future, hookId)) return false;
         if (!timedOut) {
             fishTimeoutCounter = 0;
+            hookedItemDuringTimeouts = false;
             return false;
         }
         if (fishTimeoutCounter >= 5) return false;
+        var hook = CACHE.getEntityCache().get(hookId);
+        var target = CACHE.getEntityCache().get(hookedEntityId(hook, CACHE.getPlayerCache().getEntityId()));
+        hookedItemDuringTimeouts |= target != null && target.getEntityType() == EntityType.ITEM;
         return ++fishTimeoutCounter == 5;
     }
 
