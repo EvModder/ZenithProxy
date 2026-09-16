@@ -128,7 +128,7 @@ public class NotificationEventListener {
 
     public void handleSpawnPatrolTargetKilledEvent(SpawnPatrolTargetKilledEvent event) {
         var embed = Embed.builder()
-            .title("Target Killed")
+            .title(CONFIG.authentication.username + " killed target " + event.profile().getName())
             .addField("Target", "[" + event.profile().getName() + "](https://namemc.com/profile/" + event.profile().getId() + ")", false)
             .addField("Death Message", escape(event.message())  , false)
             .thumbnail(Proxy.getInstance().getPlayerBodyURL(event.profile().getId()).toString())
@@ -297,7 +297,7 @@ public class NotificationEventListener {
 
     public void handleDeathEvent(ClientDeathEvent event) {
         var embed = Embed.builder()
-            .title("Player Death")
+            .title(CONFIG.authentication.username + " died")
             .errorColor()
             .addField("Coordinates", getCoordinates(CACHE.getPlayerCache().getThePlayer()), false)
             .addField("Dimension", World.getCurrentDimension().name(), false);
@@ -642,9 +642,8 @@ public class NotificationEventListener {
         event.deathMessage().killer().ifPresent(killer -> {
             if (!killer.name().equals(CONFIG.authentication.username)) return;
             sendEmbedMessage(Embed.builder()
-                .title("Kill Detected")
+                .title(CONFIG.authentication.username + " killed " + event.deathMessage().victim())
                 .primaryColor()
-                .addField("Victim", escape(event.deathMessage().victim()), false)
                 .addField("Message", escape(event.message()), false)
                 .thumbnail(Proxy.getInstance().getPlayerHeadURL(event.deathMessage().victim()).toString()));
         });
@@ -730,14 +729,13 @@ public class NotificationEventListener {
         var embed = Embed.builder();
         if (event.prio()) {
             embed
-                .title("Prio Queue Status Detected")
+                .title(CONFIG.authentication.username + " gained Prio Queue")
                 .successColor();
         } else {
             embed
-                .title("Prio Queue Status Lost")
+                .title(CONFIG.authentication.username + " lost Prio Queue")
                 .errorColor();
         }
-        embed.addField("User", escape(CONFIG.authentication.username), false);
         if (CONFIG.discord.mentionRoleOnPrioUpdate) {
             sendEmbedMessage(notificationMention(), embed);
         } else {

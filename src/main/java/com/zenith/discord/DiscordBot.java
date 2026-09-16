@@ -51,6 +51,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static com.github.rfresh2.EventConsumer.of;
@@ -419,8 +420,21 @@ public class DiscordBot {
     }
 
     public void defaultEmbedDecoration(Embed embed) {
+        addAccountFooter(embed, CONFIG.authentication.username);
         //TODO: add config option for this
         // if (embed.timestamp() == null) embed.timestamp(Instant.now());
+    }
+
+    static void addAccountFooter(Embed embed, String account) {
+        if (account == null || account.isBlank()) return;
+        // The title already identifies the account (e.g. "EvMD disconnected")
+        if (embed.title() != null && Pattern.compile("(?<![A-Za-z0-9_])" + Pattern.quote(account) + "(?![A-Za-z0-9_])",
+            Pattern.CASE_INSENSITIVE).matcher(embed.title()).find()) return;
+        var label = "Account: " + account;
+        var footer = embed.footer();
+        if (footer != null && (footer.text().equals(label) || footer.text().startsWith(label + " | "))) return;
+        embed.footer(footer == null || footer.text().isBlank() ? label : label + " | " + footer.text(),
+            footer == null ? null : footer.iconUrl());
     }
 
     public void sendEmbedMessageTo(TextChannel channel, @Nullable String message, Embed embed) {

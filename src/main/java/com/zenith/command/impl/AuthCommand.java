@@ -77,13 +77,12 @@ public class AuthCommand extends Command {
                 var result = Authenticator.INSTANCE.refreshAuthCacheNow();
                 if (result.success()) {
                     c.getSource().getEmbed()
-                        .title("Auth Cache Refreshed Successfully")
-                        .addField("Username", escape(CONFIG.authentication.username))
+                        .title(CONFIG.authentication.username + " auth cache refreshed")
                         .successColor();
                     return OK;
                 } else {
                     c.getSource().getEmbed()
-                        .title("Auth Cache Refresh Failed")
+                        .title(CONFIG.authentication.username + " auth cache refresh failed")
                         .description(escape(result.reason()))
                         .errorColor();
                     return ERROR;
