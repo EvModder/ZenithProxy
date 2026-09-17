@@ -7,16 +7,27 @@ import com.zenith.event.module.*;
 import com.zenith.event.player.PlayerDisconnectedEvent;
 import com.zenith.mc.item.ItemRegistry;
 import com.zenith.module.api.Module;
+import com.zenith.network.client.ClientSession;
+import com.zenith.network.codec.ClientEventLoopPacketHandler;
+import com.zenith.network.codec.PacketHandlerCodec;
+import com.zenith.network.codec.PacketHandlerStateCodec;
+import org.geysermc.mcprotocollib.network.packet.Packet;
+import org.geysermc.mcprotocollib.protocol.data.ProtocolState;
+import org.geysermc.mcprotocollib.protocol.data.game.entity.EntityEvent;
 import org.geysermc.mcprotocollib.protocol.data.game.item.ItemStack;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundEntityEventPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.inventory.ClientboundContainerSetContentPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.inventory.ClientboundContainerSetSlotPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.inventory.ClientboundSetPlayerInventoryPacket;
 
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 
 import static com.github.rfresh2.EventConsumer.of;
 import static com.zenith.Globals.*;
 
 public class AutoDisconnect extends Module {
     public static final String AUTODISCONNECT_REASON_PREFIX = "[AutoDisconnect] ";
+    private volatile ClientSession pendingTotemSession;
 
     public AutoDisconnect() {
         super();
@@ -29,7 +40,6 @@ public class AutoDisconnect extends Module {
             of(WeatherChangeEvent.class, this::handleWeatherChangeEvent),
             of(PlayerDisconnectedEvent.class, this::handleProxyClientDisconnectedEvent),
             of(ServerPlayerInVisualRangeEvent.class, this::handleNewPlayerInVisualRangeEvent),
-            of(TotemPopEvent.class, this::handleTotemPopEvent),
             of(AutoReconnectDecisionEvent.class, this::handleAutoReconnectDecisionEvent)
         );
     }
@@ -79,18 +89,54 @@ public class AutoDisconnect extends Module {
         doDisconnect("Unknown Player: " + event.playerEntry().getProfile().getName());
     }
 
-    private void handleTotemPopEvent(TotemPopEvent event) {
-        if (!CONFIG.client.extra.utility.actions.autoDisconnect.onTotemPop) return;
-        if (event.entityId() != CACHE.getPlayerCache().getEntityId()) return;
-        if (playerConnectedCheck()) {
-            info("Totem popped");
-            // delay execution to allow inventory to update
-            EXECUTOR.schedule(() -> {
-                var totemCount = countTotems();
-                if (totemCount < CONFIG.client.extra.utility.actions.autoDisconnect.minTotemsRemaining && playerConnectedCheck()) {
-                    doDisconnect("Totem Pop - " + totemCount + " remaining");
-                }
-            }, 1, TimeUnit.SECONDS);
+    @Override
+    public PacketHandlerCodec registerClientPacketHandlerCodec() {
+        return PacketHandlerCodec.clientBuilder().setId("autodisconnect").setPriority(-5)
+            .state(ProtocolState.GAME, PacketHandlerStateCodec.clientBuilder()
+                .inbound(ClientboundEntityEventPacket.class,
+                    (ClientEventLoopPacketHandler<ClientboundEntityEventPacket, ClientSession>) this::handleTotemPacket)
+                .inbound(ClientboundContainerSetSlotPacket.class, inventoryCheck())
+                .inbound(ClientboundContainerSetContentPacket.class, inventoryCheck())
+                .inbound(ClientboundSetPlayerInventoryPacket.class, inventoryCheck())
+                .build()).build();
+    }
+
+    @Override
+    public void onDisable() {
+        pendingTotemSession = null;
+    }
+
+    boolean handleTotemPacket(ClientboundEntityEventPacket packet, ClientSession session) {
+        if (packet.getEvent() == EntityEvent.TOTEM_OF_UNDYING_MAKE_SOUND
+            && packet.getEntityId() == CACHE.getPlayerCache().getEntityId()
+            && session == Proxy.getInstance().getClient()
+            && enabledSetting() && CONFIG.client.extra.utility.actions.autoDisconnect.onTotemPop
+            && playerConnectedCheck()) {
+            pendingTotemSession = session;
+            checkTotems(session);
+        }
+        return true;
+    }
+
+    private <P extends Packet> ClientEventLoopPacketHandler<P, ClientSession> inventoryCheck() {
+        // Run after the standard handlers update the inventory cache on this same
+        // event loop. A pop may arrive before or after its consumed-slot update.
+        return (packet, session) -> {
+            checkTotems(session);
+            return true;
+        };
+    }
+
+    void checkTotems(ClientSession session) {
+        if (session == null || pendingTotemSession != session || session != Proxy.getInstance().getClient()) return;
+        if (!enabledSetting() || !CONFIG.client.extra.utility.actions.autoDisconnect.onTotemPop || !playerConnectedCheck()) {
+            pendingTotemSession = null;
+            return;
+        }
+        int remaining = countTotems();
+        if (remaining < CONFIG.client.extra.utility.actions.autoDisconnect.minTotemsRemaining) {
+            pendingTotemSession = null;
+            doDisconnect("Totem Pop - " + remaining + " remaining");
         }
     }
 
@@ -104,7 +150,7 @@ public class AutoDisconnect extends Module {
         return true;
     }
 
-    private void doDisconnect(String reason) {
+    protected void doDisconnect(String reason) {
         Proxy.getInstance().disconnect(AUTODISCONNECT_REASON_PREFIX + reason);
     }
 

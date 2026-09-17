@@ -127,7 +127,7 @@ tasks {
         if (providers.gradleProperty("offlineTests").isPresent) {
             // Explicit allowlist: other upstream tests can launch proxies or contact live services.
             include("com/zenith/RotationRangeCheckTest.class", "com/zenith/discord/EmbedSerializerTest.class",
-                "com/zenith/module/impl/AutoFishTest.class")
+                "com/zenith/module/impl/AutoFishTest.class", "com/zenith/module/impl/AutoDisconnectTest.class")
         }
         workingDir = layout.projectDirectory.dir("run").asFile
         forkEvery = 1 // needed bc zenith uses global static state
