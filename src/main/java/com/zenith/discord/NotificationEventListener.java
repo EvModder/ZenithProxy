@@ -775,14 +775,16 @@ public class NotificationEventListener {
     }
 
     public void handleReplayStartedEvent(final ReplayStartedEvent event) {
+        if (!CONFIG.client.extra.replayMod.notifyRecordingStartStop) return;
         sendEmbedMessage(Embed.builder()
             .title("Replay Recording Started")
             .primaryColor());
     }
 
     public void handleReplayStoppedEvent(final ReplayStoppedEvent event) {
+        boolean notify = CONFIG.client.extra.replayMod.notifyRecordingStartStop;
         var embed = Embed.builder()
-            .title("Replay Recording Stopped")
+            .title(notify ? "Replay Recording Stopped" : "Replay Recording")
             .primaryColor();
         var replayFile = event.replayFile();
         if (replayFile != null && CONFIG.client.extra.replayMod.sendRecordingsToDiscord) {
@@ -796,7 +798,7 @@ public class NotificationEventListener {
                             .title("Replay Recording Stopped")
                             .description("Replay file too large to upload directly to discord: " + replaySizeMb + "mb\nUpload to file.io in progress...")
                             .inQueueColor();
-                        sendEmbedMessage(notiEmbed);
+                        if (notify) sendEmbedMessage(notiEmbed);
                         var fileIOResponse = FileIOApi.INSTANCE.uploadFile(replayFile.getName(), in);
                         if (fileIOResponse.isEmpty() || !fileIOResponse.get().success()) {
                             embed.description("Failed uploading to file.io and replay too large to upload to discord: " + replaySizeMb + "mb");
@@ -808,13 +810,14 @@ public class NotificationEventListener {
                     }
                 } else {
                     embed.fileAttachment(new Embed.FileAttachment(replayFile.getName(), in.readAllBytes()));
+                    if (!notify) embed.title(null);
                 }
             } catch (final Exception e) {
                 DISCORD_LOG.error("Failed to read replay file", e);
                 embed.description("Error reading replay file: " + e.getMessage());
             }
         }
-        sendEmbedMessage(embed);
+        if (notify || embed.fileAttachment() != null || embed.description() != null) sendEmbedMessage(embed);
     }
 
     public void handleTotemPopEvent(final PlayerTotemPopAlertEvent event) {

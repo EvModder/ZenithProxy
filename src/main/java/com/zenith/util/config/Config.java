@@ -510,6 +510,7 @@ public final class Config {
             }
 
             public static final class ReplayMod {
+                public boolean notifyRecordingStartStop = false;
                 public boolean sendRecordingsToDiscord = false;
                 public int maxRecordingTimeMins = 0;
                 public AutoRecordMode autoRecordMode = AutoRecordMode.NONE;

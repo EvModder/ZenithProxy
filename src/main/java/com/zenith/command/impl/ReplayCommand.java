@@ -42,6 +42,7 @@ public class ReplayCommand extends Command {
                 "start",
                 "stop",
                 "discordUpload on/off",
+                "notifyStartStop on/off",
                 "fileIoUpload on/off",
                 "maxRecordingTime <minutes>",
                 "autoRecord mode <off/online/proxyConnected/playerConnected/health>",
@@ -80,6 +81,12 @@ public class ReplayCommand extends Command {
                 c.getSource().setNoOutput(true);
                 return OK;
             }))
+            .then(literal("notifyStartStop").requires(Command::validateAccountOwner).then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.client.extra.replayMod.notifyRecordingStartStop = getToggle(c, "toggle");
+                c.getSource().getEmbed().title("Replay Start/Stop Notifications "
+                    + toggleStrCaps(CONFIG.client.extra.replayMod.notifyRecordingStartStop));
+                return OK;
+            })))
             .then(literal("discordUpload").requires(Command::validateAccountOwner).then(argument("toggle", toggle()).executes(c -> {
                 CONFIG.client.extra.replayMod.sendRecordingsToDiscord = getToggle(c, "toggle");
                 c.getSource().getEmbed()
@@ -135,6 +142,7 @@ public class ReplayCommand extends Command {
         embed
             .primaryColor()
             .addField("Discord Upload", toggleStr(CONFIG.client.extra.replayMod.sendRecordingsToDiscord))
+            .addField("Start/Stop Notifications", toggleStr(CONFIG.client.extra.replayMod.notifyRecordingStartStop))
             .addField("file.io Upload", toggleStr(CONFIG.client.extra.replayMod.fileIOUploadIfTooLarge))
             .addField("Max Recording Time", getMaxRecordingTimeStr())
             .addField("Auto Record Mode", CONFIG.client.extra.replayMod.autoRecordMode.getName())

@@ -128,7 +128,7 @@ tasks {
             // Explicit allowlist: other upstream tests can launch proxies or contact live services.
             include("com/zenith/RotationRangeCheckTest.class", "com/zenith/discord/EmbedSerializerTest.class",
                 "com/zenith/module/impl/AutoFishTest.class", "com/zenith/module/impl/AutoDisconnectTest.class",
-                "com/zenith/discord/EmbedDecorationTest.class")
+                "com/zenith/discord/EmbedDecorationTest.class", "com/zenith/discord/ReplayNotificationTest.class")
         }
         workingDir = layout.projectDirectory.dir("run").asFile
         forkEvery = 1 // needed bc zenith uses global static state

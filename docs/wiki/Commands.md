@@ -2123,6 +2123,8 @@ Additional recording modes can be configured in the `visualRange` command.
 
   ```replay discordUpload on/off```
 
+  ```replay notifyStartStop on/off```
+
   ```replay fileIoUpload on/off```
 
   ```replay maxRecordingTime <minutes>```

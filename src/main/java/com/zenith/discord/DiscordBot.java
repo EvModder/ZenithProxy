@@ -441,13 +441,7 @@ public class DiscordBot {
         defaultEmbedDecoration(embed);
         if (isRunning()) {
             try {
-                var msgBuilder = new MessageCreateBuilder()
-                    .setContent(message)
-                    .addEmbeds(embed.toJDAEmbed());
-                if (embed.fileAttachment() != null) {
-                    msgBuilder.addFiles(FileUpload.fromData(new ByteArrayInputStream(embed.fileAttachment.data()), embed.fileAttachment.name()));
-                }
-                channel.sendMessage(msgBuilder.build()).queue();
+                channel.sendMessage(notificationMessage(message, embed)).queue();
             } catch (final Exception e) {
                 DISCORD_LOG.error("Failed sending embed message", e);
             }
@@ -457,6 +451,18 @@ public class DiscordBot {
 
     public void sendEmbedMessage(Embed embed) {
         sendEmbedMessage(null, embed);
+    }
+
+    static MessageCreateData notificationMessage(@Nullable String message, Embed embed) {
+        var builder = new MessageCreateBuilder().setContent(message);
+        // A titleless attachment is intentionally sent without a redundant notification embed.
+        if (embed.title() != null || embed.fileAttachment() == null || embed.description() != null || !embed.fields().isEmpty()) {
+            builder.addEmbeds(embed.toJDAEmbed());
+        }
+        if (embed.fileAttachment() != null) {
+            builder.addFiles(FileUpload.fromData(embed.fileAttachment().data(), embed.fileAttachment().name()));
+        }
+        return builder.build();
     }
 
     public void sendEmbedMessage(@Nullable String message, Embed embed) {
