@@ -3,6 +3,7 @@ package com.zenith.network.client.handler.incoming;
 import com.zenith.Proxy;
 import com.zenith.cache.CacheResetType;
 import com.zenith.feature.player.World;
+import com.zenith.feature.player.PearlTeleportTracker.Position;
 import com.zenith.feature.spectator.SpectatorSync;
 import com.zenith.mc.dimension.DimensionRegistry;
 import com.zenith.network.client.ClientSession;
@@ -35,6 +36,9 @@ public class RespawnHandler implements ClientEventLoopPacketHandler<ClientboundR
 
     @Override
     public boolean applyAsync(final ClientboundRespawnPacket packet, final ClientSession session) {
+        var player = CACHE.getPlayerCache();
+        session.getPearlTeleportTracker().respawn(new Position(
+            World.getCurrentDimension().name(), player.getX(), player.getY(), player.getZ()), player.getThePlayer().getHealth() > 0);
         // must send respawn packet before cache gets reset
         // lots of race conditions with packet sequence could happen
         if (isSpectatorRespawning.compareAndSet(false, true)) {

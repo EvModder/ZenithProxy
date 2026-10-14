@@ -2459,6 +2459,27 @@ Configure the integrated ViaVersion module.
   ```via playerToZenith on/off```
 
 
+### pearlNotifications
+
+Notify about long-distance or cross-dimension teleports accompanied by our own ender-pearl damage within one second.
+
+Ignores login, death respawn, short/loaded-range moves, and teleports without pearl-damage evidence.
+
+No alert is sent if the server suppresses pearl damage.
+
+Within a dimension, the distance threshold is at least 256 blocks and the server view distance.
+
+Coordinates follow the Discord reportCoords setting. Controller and spectator connections suppress alerts by default.
+
+**Usage**
+
+  ```pearlNotifications on/off```
+
+  ```pearlNotifications whileClientConnected on/off```
+
+  ```pearlNotifications minDistance <blocks>```
+
+
 ### visualRange
 
 Configure the VisualRange notification feature.

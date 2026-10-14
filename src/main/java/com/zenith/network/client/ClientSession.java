@@ -2,6 +2,7 @@ package com.zenith.network.client;
 
 import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import com.zenith.Proxy;
+import com.zenith.feature.player.PearlTeleportTracker;
 import com.zenith.event.client.ClientConnectEvent;
 import com.zenith.event.client.ClientDisconnectEvent;
 import com.zenith.mc.biome.BiomeRegistry;
@@ -41,6 +42,7 @@ import static java.util.Objects.isNull;
 @Getter
 @Setter
 public class ClientSession extends TcpClientSession {
+    private final PearlTeleportTracker pearlTeleportTracker = new PearlTeleportTracker();
     // client tick eventloop, separate from the netty event loop
     private final EventLoop clientEventLoop = new DefaultEventLoop(new DefaultThreadFactory("Client Event Loop", true));
     protected long ping = 0L;

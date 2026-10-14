@@ -16,6 +16,7 @@ public class PlayerCombatKillHandler implements ClientEventLoopPacketHandler<Cli
     @Override
     public boolean applyAsync(ClientboundPlayerCombatKillPacket packet, ClientSession session) {
         if (packet.getPlayerId() == CACHE.getPlayerCache().getEntityId()) {
+            session.getPearlTeleportTracker().died();
             EVENT_BUS.postAsync(new ClientDeathEvent(
                 getCoordinates(CACHE.getPlayerCache().getThePlayer()),
                 World.getCurrentDimension().name(),

@@ -15,6 +15,7 @@ import static java.util.Arrays.asList;
 public class LoginHandler implements PacketHandler<ClientboundLoginPacket, ClientSession> {
     @Override
     public ClientboundLoginPacket apply(@NonNull ClientboundLoginPacket packet, @NonNull ClientSession session) {
+        session.getPearlTeleportTracker().reset();
         CACHE.reset(CacheResetType.LOGIN);
         var serverProfile = CACHE.getProfileCache().getProfile();
         if (serverProfile == null) {

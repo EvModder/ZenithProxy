@@ -17,6 +17,7 @@ import com.zenith.event.update.UpdateAvailableEvent;
 import com.zenith.event.update.UpdateStartEvent;
 import com.zenith.feature.api.fileio.FileIOApi;
 import com.zenith.feature.player.World;
+import com.zenith.feature.player.PearlTeleportTracker.Position;
 import com.zenith.feature.queue.Queue;
 import com.zenith.module.impl.AntiAFK;
 import com.zenith.module.impl.SessionTimeLimit;
@@ -33,6 +34,7 @@ import java.io.FileInputStream;
 import java.io.InputStream;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
@@ -66,6 +68,7 @@ public class NotificationEventListener {
             of(QueueCompleteEvent.class, this::handleQueueCompleteEvent),
             of(QueueStartEvent.class, this::handleStartQueueEvent),
             of(ClientDeathEvent.class, this::handleDeathEvent),
+            of(PearlTeleportEvent.class, this::handlePearlTeleport),
             of(ClientDeathMessageEvent.class, this::handleSelfDeathMessageEvent),
             of(HealthAutoDisconnectEvent.class, this::handleHealthAutoDisconnectEvent),
             of(PlayerConnectedEvent.class, this::handleProxyClientConnectedEvent),
@@ -297,6 +300,32 @@ public class NotificationEventListener {
             sendEmbedMessage(embed);
         }
         updatePresence();
+    }
+
+    public void handlePearlTeleport(PearlTeleportEvent event) {
+        var settings = CONFIG.client.extra.pearlNotifications;
+        if (!settings.enabled || (!settings.whileClientConnected && (Proxy.getInstance().hasActivePlayer()
+            || Proxy.getInstance().getSpectatorConnections().stream().anyMatch(s -> s.isLoggedIn())))) return;
+        sendEmbedMessage(Embed.builder().title(CONFIG.authentication.username + " was pearled")
+            .description(pearlDescription(event))
+            .addField("From", teleportLocation(event.from()), false)
+            .addField("To", teleportLocation(event.to()), false)
+            .primaryColor());
+    }
+
+    static String pearlDescription(PearlTeleportEvent event) {
+        var from = event.from();
+        var to = event.to();
+        if (!from.dimension().equals(to.dimension())) return "Cross-dimension teleport.";
+        double distance = Math.hypot(Math.hypot(to.x() - from.x(), to.z() - from.z()), to.y() - from.y());
+        long rounded = (long) Math.pow(10, Math.floor(Math.log10(distance)));
+        return String.format(Locale.ROOT, "Teleported >%,d blocks.", rounded);
+    }
+
+    private static String teleportLocation(Position position) {
+        return position.dimension() + (CONFIG.discord.reportCoords
+            ? " ||[" + MathHelper.floorI(position.x()) + ", " + MathHelper.floorI(position.y()) + ", " + MathHelper.floorI(position.z()) + "]||"
+            : " (Coords disabled)");
     }
 
     public void handleDeathEvent(ClientDeathEvent event) {

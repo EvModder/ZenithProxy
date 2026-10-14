@@ -117,6 +117,7 @@ public class CommandManager {
         new UnsupportedCommand(),
         new UpdateCommand(),
         new ViaVersionCommand(),
+        new PearlNotificationsCommand(),
         new VisualRangeCommand(),
         new WaypointsCommand(),
         new WhitelistCommand()

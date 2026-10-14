@@ -144,6 +144,7 @@ public final class Config {
             public final Chat chat = new Chat();
             public final AntiKick antiKick = new AntiKick();
             public final ReplayMod replayMod = new ReplayMod();
+            public final PearlNotifications pearlNotifications = new PearlNotifications();
             public final ArrayList<PlayerEntry> friendsList = new ArrayList<>();
             public boolean autoConnectOnLogin = true;
             public boolean prioStatusChangeMention = true;
@@ -507,6 +508,12 @@ public final class Config {
                     NEAREST,
                     VISUAL_RANGE
                 }
+            }
+
+            public static final class PearlNotifications {
+                public boolean enabled = true;
+                public boolean whileClientConnected = false;
+                public int minDistance = 256;
             }
 
             public static final class ReplayMod {

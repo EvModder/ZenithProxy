@@ -2,6 +2,9 @@ package com.zenith.network.client.handler.incoming;
 
 import com.zenith.Proxy;
 import com.zenith.cache.data.PlayerCache;
+import com.zenith.feature.player.PearlTeleportTracker.Position;
+import com.zenith.feature.player.World;
+import com.zenith.feature.player.PearlNotifications;
 import com.zenith.feature.spectator.SpectatorSync;
 import com.zenith.module.impl.AntiAFK;
 import com.zenith.network.client.ClientSession;
@@ -18,6 +21,7 @@ public class PlayerPositionHandler implements ClientEventLoopPacketHandler<Clien
     @Override
     public boolean applyAsync(@NonNull ClientboundPlayerPositionPacket packet, @NonNull ClientSession session) {
         PlayerCache cache = CACHE.getPlayerCache();
+        var from = new Position(World.getCurrentDimension().name(), cache.getX(), cache.getY(), cache.getZ());
         var teleportQueue = cache.getTeleportQueue();
         cache.getTeleportQueue().add(packet);
         while (teleportQueue.size() > 100) {
@@ -35,6 +39,12 @@ public class PlayerPositionHandler implements ClientEventLoopPacketHandler<Clien
             .setYaw((packet.getRelatives().contains(PositionElement.Y_ROT) ? cache.getYaw() : 0.0f) + packet.getYaw())
             .setPitch((packet.getRelatives().contains(PositionElement.X_ROT) ? cache.getPitch() : 0.0f) + packet.getPitch());
         ServerSession currentPlayer = Proxy.getInstance().getCurrentPlayer().get();
+        var to = new Position(World.getCurrentDimension().name(), cache.getX(), cache.getY(), cache.getZ());
+        var settings = CONFIG.client.extra.pearlNotifications;
+        var event = session.getPearlTeleportTracker().teleport(from, to,
+            World.isChunkLoadedBlockPos((int) Math.floor(to.x()), (int) Math.floor(to.z())),
+            Math.max(settings.minDistance, CACHE.getChunkCache().getServerViewDistance() * 16.0), PearlNotifications.allowed(session));
+        PearlNotifications.publish(event, session);
         if (isNull(currentPlayer) || !currentPlayer.isLoggedIn()) {
             BOT.handlePlayerPosRotate(packet.getId());
         } else {
