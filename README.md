@@ -25,6 +25,7 @@ This is a fork by [EvModder](https://github.com/EvModder), adapted for my own pe
 - **Periodic clicks:** Allows left/right click intervals above 100 ticks.
 - **Autofishing:** Reliable bite detection, two-attempt hooked-loot recovery, clearer warnings.
 - **Totem disconnect:** Checks pops and inventory updates without the one-second delay.
+- **Death notices:** Combines death location and death message into one notification.
 - **Replay notices:** Start/stop notices default off; uploads and failures remain visible (`replay notifyStartStop on/off`).
 
 To rfresh: Feel free to copy anything here you like, or DM for a PR.

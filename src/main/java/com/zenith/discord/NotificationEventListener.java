@@ -47,6 +47,10 @@ import static java.util.Arrays.asList;
 import static java.util.Objects.nonNull;
 
 public class NotificationEventListener {
+    private final DeathNotifications deaths = new DeathNotifications(embed -> {
+        if (CONFIG.discord.mentionRoleOnDeath) sendEmbedMessage(notificationMention(), embed);
+        else sendEmbedMessage(embed);
+    }, System::nanoTime);
     public static final NotificationEventListener INSTANCE = new NotificationEventListener();
 
     public void subscribeEvents() {
@@ -299,20 +303,17 @@ public class NotificationEventListener {
         var embed = Embed.builder()
             .title(CONFIG.authentication.username + " died")
             .errorColor()
-            .addField("Coordinates", getCoordinates(CACHE.getPlayerCache().getThePlayer()), false)
-            .addField("Dimension", World.getCurrentDimension().name(), false);
-        if (CONFIG.discord.mentionRoleOnDeath) {
-            sendEmbedMessage(notificationMention(), embed);
-        } else {
-            sendEmbedMessage(embed);
-        }
+            .addField("Coordinates", event.coordinates() == null
+                ? getCoordinates(CACHE.getPlayerCache().getThePlayer()) : event.coordinates(), false)
+            .addField("Dimension", event.dimension() == null
+                ? World.getCurrentDimension().name() : event.dimension(), false);
+        if (event.message() != null && !event.message().isBlank()) embed.addField("Message", escape(event.message()), false);
+        deaths.death(embed);
+        EXECUTOR.schedule(() -> deaths.flush(embed), 2, TimeUnit.SECONDS);
     }
 
     public void handleSelfDeathMessageEvent(ClientDeathMessageEvent event) {
-        sendEmbedMessage(Embed.builder()
-            .title("Death Message")
-            .errorColor()
-            .addField("Message", event.message(), false));
+        deaths.message(escape(event.message()));
     }
 
     public void handleHealthAutoDisconnectEvent(HealthAutoDisconnectEvent event) {
