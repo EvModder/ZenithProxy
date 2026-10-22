@@ -58,6 +58,20 @@ public class World {
         return CACHE.getChunkCache().isChunkLoaded(chunkX, chunkZ);
     }
 
+    public int getSurfaceHeight(int x, int z) {
+        var dimension = getCurrentDimension();
+        if (!isChunkLoadedBlockPos(x, z)) {
+            return dimension.buildHeight();
+        }
+        for (int y = dimension.buildHeight() - 1; y >= dimension.minY(); y--) {
+            var b = getBlock(x, y, z);
+            if (!b.isAir()) {
+                return y + 1;
+            }
+        }
+        return dimension.minY();
+    }
+
     public boolean isInWorldBounds(final int x, final int y, final int z) {
         var dim = getCurrentDimension();
         if (y < dim.minY() || y > dim.buildHeight()) return false;
@@ -212,13 +226,25 @@ public class World {
         return entityType.name().contains("_BOAT") || entityType.name().contains("_RAFT");
     }
 
+    @Deprecated
     public boolean isWater(Block block) {
         return block == BlockRegistry.WATER
             || block == BlockRegistry.BUBBLE_COLUMN;
     }
 
+    public boolean isWater(int blockStateId) {
+        var fluidState = getFluidState(blockStateId);
+        if (fluidState == null) return false;
+        return fluidState.water();
+    }
+
+    @Deprecated
     public boolean isFluid(Block block) {
         return isWater(block) || block == BlockRegistry.LAVA;
+    }
+
+    public boolean isFluid(int blockStateId) {
+        return getFluidState(blockStateId) != null;
     }
 
     public @Nullable FluidState getFluidState(int blockStateId) {

@@ -3,6 +3,7 @@ package com.zenith.feature.pathfinder;
 import com.zenith.cache.data.entity.EntityLiving;
 import com.zenith.feature.player.Bot;
 import com.zenith.feature.player.Rotation;
+import com.zenith.feature.player.World;
 import com.zenith.feature.player.raycast.BlockRaycastResult;
 import com.zenith.feature.player.raycast.RaycastHelper;
 import com.zenith.mc.block.BlockPos;
@@ -11,8 +12,7 @@ import org.cloudburstmc.math.vector.Vector3d;
 import java.util.Optional;
 import java.util.stream.Stream;
 
-import static com.zenith.Globals.BOT;
-import static com.zenith.Globals.CACHE;
+import static com.zenith.Globals.*;
 
 public final class PlayerContext {
     public static final PlayerContext INSTANCE = new PlayerContext();
@@ -39,33 +39,40 @@ public final class PlayerContext {
     //    HitResult objectMouseOver();
     //
     public BlockPos playerFeet() {
-        // TODO find a better way to deal with soul sand!!!!!
-        BlockPos feet = new BlockPos(player().getX(), player().getY() + 0.1251, player().getZ());
-
-        // todo: ???
-        if (BlockStateInterface.getBlock(feet).name().endsWith("_slab")) {
-            return feet.above();
+        var feet = new BlockPos(player().getX(), player().getY(), player().getZ());
+        if (player().getY() - feet.y() < 0.25) {
+            return feet;
         }
-
-        return feet;
+        // check if we could be on a short block
+        if (BLOCK_DATA.getCollisionBoxesFromBlockStateId(World.getBlockStateId(feet)).isEmpty()) {
+            return feet;
+        }
+        var localizedFeetCbs = World.getBlockState(feet).getLocalizedCollisionBoxes();
+        // check if we're inside a solid block
+        var playerCb = BOT.getPlayerCollisionBox()
+            .inflate(-1.0E-7, -1.0E-7, -1.0E-7);
+        for (var cb : localizedFeetCbs) {
+            if (playerCb.intersects(cb)) {
+                return feet;
+            }
+        }
+        // if not, shift up for blocks like half slabs and sould sand
+        return feet.above();
     }
 
-    //
-    //    default Vec3 playerFeetAsVec() {
-    //        return new Vec3(player().position().x, player().position().y, player().position().z);
-    //    }
-    //
+    public Vector3d playerFeetAsVec() {
+        return Vector3d.from(player().getX(), player().getY(), player().getZ());
+    }
+
+    public Vector3d playerMotion() {
+        var velocity = player().getVelocity();
+        return Vector3d.from(velocity.getX(), velocity.getY(), velocity.getZ());
+    }
+
     public Vector3d playerHead() {
         return Vector3d.from(player().getX(), player().getEyeY(), player().getZ());
     }
 
-//
-//    default Vec3 playerMotion() {
-//        return player().getDeltaMovement();
-//    }
-//
-//    BetterBlockPos viewerPos();
-//
     public Rotation playerRotations() {
         return new Rotation(player().getYaw(), player().getPitch());
     }

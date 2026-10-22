@@ -14,7 +14,6 @@ import com.zenith.mc.block.properties.api.BlockStateProperties;
 import com.zenith.mc.dimension.DimensionRegistry;
 import com.zenith.mc.entity.EntityData;
 import com.zenith.mc.entity.EntityDimensions;
-import com.zenith.mc.entity.EntityRegistry;
 import com.zenith.mc.item.ItemRegistry;
 import com.zenith.module.api.ModuleUtils;
 import com.zenith.util.math.MathHelper;
@@ -103,7 +102,6 @@ public final class Bot extends ModuleUtils {
     private int ticksSinceLastPositionPacketSent;
     private final MutableVec3d stuckSpeedMultiplier = new MutableVec3d(0, 0, 0);
     @Getter private final MutableVec3d velocity = new MutableVec3d(0, 0, 0);
-    private boolean wasLeftClicking = false;
     private final Input movementInput = new Input();
     private InputRequestFuture inputRequestFuture = InputRequestFuture.rejected;
     private Input lastSentMovementInput = new Input(movementInput);
@@ -125,6 +123,7 @@ public final class Bot extends ModuleUtils {
     // todo: local attribute cache
     private static final Attribute DEFAULT_SPEED_ATTRIBUTE = new Attribute(AttributeType.Builtin.MOVEMENT_SPEED, 0.10000000149011612f);
     private Attribute speedAttribute = DEFAULT_SPEED_ATTRIBUTE;
+    private boolean tickSkipped = false;
 
     public Bot() {
         EVENT_BUS.subscribe(
@@ -202,7 +201,6 @@ public final class Bot extends ModuleUtils {
             if (movementInput.clickRequiresRotation) {
                 if (!MathHelper.isYawInRange(requestedYaw, yaw, 0.1f) || !MathHelper.isPitchInRange(requestedPitch, pitch, 0.1f)) {
                     interactions.stopDestroyBlock();
-                    wasLeftClicking = false;
                     return;
                 }
             }
@@ -212,33 +210,31 @@ public final class Bot extends ModuleUtils {
                     int blockX = raycast.block().x();
                     int blockY = raycast.block().y();
                     int blockZ = raycast.block().z();
-                    if (!wasLeftClicking && !interactions.isDestroying()) {
-                        interactions.startDestroyBlock(
+                    if (!interactions.isDestroying(blockX, blockY, blockZ)) {
+                        if (interactions.startDestroyBlock(
                             MathHelper.floorI(blockX),
                             MathHelper.floorI(blockY),
                             MathHelper.floorI(blockZ),
-                            raycast.block().direction());
-                        sendClientPacketAsync(new ServerboundSwingPacket(Hand.MAIN_HAND));
-                        wasLeftClicking = true;
-                        inputRequestFuture.setClickResult(ClickResult.LeftClickResult.startDestroyBlock(blockX, blockY, blockZ, raycast.block().block()));
-                        return;
+                            raycast.block().direction())
+                        ) {
+                            inputRequestFuture.setClickResult(ClickResult.LeftClickResult.startDestroyBlock(blockX, blockY, blockZ, raycast.block().block()));
+                        } else {
+                            interactions.stopDestroyBlock();
+                        }
                     } else {
                         if (interactions.continueDestroyBlock(
                             MathHelper.floorI(blockX),
                             MathHelper.floorI(blockY),
                             MathHelper.floorI(blockZ),
-                            raycast.block().direction())) {
-                            sendClientPacketAsync(new ServerboundSwingPacket(Hand.MAIN_HAND));
-                            wasLeftClicking = true;
+                            raycast.block().direction())
+                        ) {
+                            inputRequestFuture.setClickResult(ClickResult.LeftClickResult.continueDestroyBlock(blockX, blockY, blockZ, raycast.block().block()));
                         } else {
-                            // we could not continue breaking this block for some reason
-                            wasLeftClicking = false;
                             interactions.stopDestroyBlock();
-                            sendClientPacketAsync(new ServerboundSwingPacket(Hand.MAIN_HAND));
                         }
-                        inputRequestFuture.setClickResult(ClickResult.LeftClickResult.continueDestroyBlock(blockX, blockY, blockZ, raycast.block().block()));
-                        return;
                     }
+                    sendClientPacketAsync(new ServerboundSwingPacket(Hand.MAIN_HAND));
+                    return;
                 } else if (raycast.hit() && raycast.isEntity() && raycast.entity().entityData().attackable()) {
                     debug("Click attacking entity: {} [{}, {}, {}]", raycast.entity().entity().getEntityType(), raycast.entity().entity().getX(), raycast.entity().entity().getY(), raycast.entity().entity().getZ());
                     interactions.attackEntity(raycast.entity());
@@ -273,7 +269,6 @@ public final class Bot extends ModuleUtils {
             // todo: track ongoing right click item consumes
             //  and if one is cancelled, do interactions.releaseUsingItem()
             interactions.stopDestroyBlock();
-            wasLeftClicking = false;
         } catch (final Exception e) {
             CLIENT_LOG.error("Error during interaction tick", e);
         }
@@ -281,10 +276,11 @@ public final class Bot extends ModuleUtils {
 
     void onInteractionTickSkipped() {
         interactions.stopDestroyBlock();
-        wasLeftClicking = false;
+        tickSkipped = true;
     }
 
     private void tick(final ClientBotTick event) {
+        tickSkipped = false;
         if (!CACHE.getChunkCache().isChunkLoaded((int) x >> 4, (int) z >> 4)) {
             onInteractionTickSkipped();
             return;
@@ -302,11 +298,16 @@ public final class Bot extends ModuleUtils {
             return;
         }
 
+        if (CACHE.getPlayerCache().getThePlayer().isInVehicle()) {
+            // vehicle passengers ticked in EntityCache
+            // so player can move outside the bot tick logic in this class
+            syncRiddenPosition();
+        }
+
         // stop movement and interaction inputs while a container is open
         if (handleOpenContainer()) {
             movementInput.reset();
             this.inputRequestFuture.complete(false);
-            this.inputRequestFuture = InputRequestFuture.rejected;
         } else {
             if (!CONFIG.debug.botRotateBeforeInteract) {
                 interactionTick();
@@ -504,7 +505,6 @@ public final class Bot extends ModuleUtils {
             this.lastSprinting = this.isSprinting;
         }
         tickEntityPushing();
-        rideTick();
         var currentPose = pose;
         updatePlayerPose();
         if (currentPose != pose) {
@@ -517,7 +517,10 @@ public final class Bot extends ModuleUtils {
     }
 
     void postTick(ClientBotTick event) {
-        this.inputRequestFuture.notifyListeners();
+        this.inputRequestFuture.complete(!tickSkipped);
+        if (this.inputRequestFuture.getNow()) {
+            this.inputRequestFuture.notifyListeners();
+        }
         this.inputRequestFuture = InputRequestFuture.rejected;
         sendClientPacket(ServerboundClientTickEndPacket.INSTANCE);
     }
@@ -676,11 +679,12 @@ public final class Bot extends ModuleUtils {
     }
 
     public void handlePlayerPosRotate(final int teleportId) {
-        syncFromCache(true);
+        syncFromCache(false);
         CLIENT_LOG.info("Server teleport {} to: {}, {}, {}", teleportId, String.format("%.8f", this.x), String.format("%.8f", this.y), String.format("%.8f", this.z));
         sendClientPacketAwait(new ServerboundAcceptTeleportationPacket(teleportId));
         sendClientPacketAwait(new ServerboundMovePlayerPosRotPacket(false, false, this.x, this.y, this.z, this.yaw, this.pitch));
         CLIENT_LOG.debug("Accepted teleport: {}", teleportId);
+        this.velocity.set(CACHE.getPlayerCache().getVelX(), CACHE.getPlayerCache().getVelY(), CACHE.getPlayerCache().getVelZ());
     }
 
     public void handlePlayerRotate() {
@@ -1313,10 +1317,12 @@ public final class Bot extends ModuleUtils {
 
     private float getBlockSpeedFactor() {
         if (this.isFallFlying || this.isFlying) return 1.0f;
-        Block inBlock = World.getBlock(MathHelper.floorI(x), MathHelper.floorI(y), MathHelper.floorI(z));
+        int blockX = MathHelper.floorI(x);
+        int blockY = MathHelper.floorI(y);
+        int blockZ = MathHelper.floorI(z);
+        Block inBlock = World.getBlock(blockX, blockY, blockZ);
         float inBlockSpeedFactor = inBlock.speedFactor();
-        if (inBlockSpeedFactor != 1.0f || World.isWater(inBlock)) return inBlockSpeedFactor;
-        int blockX, blockY, blockZ;
+        if (inBlockSpeedFactor != 1.0f || World.isWater(World.getBlockStateId(blockX, blockY, blockZ))) return inBlockSpeedFactor;
         if (supportingBlockPos.isPresent()) {
             BlockPos pos = supportingBlockPos.get();
             blockX = pos.x();
@@ -1364,9 +1370,19 @@ public final class Bot extends ModuleUtils {
         }
         this.isSwimming = CACHE.getPlayerCache().getThePlayer().isSwimming();
         updateFallFlying();
-        rideTick();
         syncPlayerCollisionBox();
         updateAttributes();
+    }
+
+    // will cause desync unless we know that player is in a vehicle
+    private void syncRiddenPosition() {
+        if (!CACHE.getPlayerCache().getThePlayer().isInVehicle()) return;
+        this.x = CACHE.getPlayerCache().getX();
+        this.y = CACHE.getPlayerCache().getY();
+        this.z = CACHE.getPlayerCache().getZ();
+        this.yaw = CACHE.getPlayerCache().getYaw();
+        this.pitch = CACHE.getPlayerCache().getPitch();
+        syncPlayerCollisionBox();
     }
 
     private void updateInWaterStateAndDoFluidPushing() {
@@ -1558,7 +1574,8 @@ public final class Bot extends ModuleUtils {
                     .setYaw((packet.getRelatives().contains(PositionElement.Y_ROT) ? cache.getYaw() : 0.0f) + packet.getYaw())
                     .setPitch((packet.getRelatives().contains(PositionElement.X_ROT) ? cache.getPitch() : 0.0f) + packet.getPitch());
                 debug("Sending queued teleport: {}", packet.getId());
-                syncFromCache(true);
+                syncFromCache(false);
+                this.velocity.set(CACHE.getPlayerCache().getVelX(), CACHE.getPlayerCache().getVelY(), CACHE.getPlayerCache().getVelZ());
                 sendClientPacketAwait(new ServerboundAcceptTeleportationPacket(packet.getId()));
                 sendClientPacketAwait(new ServerboundMovePlayerPosRotPacket(false, false, x, y, z, yaw, pitch));
             }
@@ -1668,24 +1685,6 @@ public final class Bot extends ModuleUtils {
             }
         }
         return levelCbs;
-    }
-
-    private void rideTick() {
-        var player = CACHE.getPlayerCache().getThePlayer();
-        if (!player.isInVehicle()) return;
-        var vehicle = CACHE.getEntityCache().get(player.getVehicleId());
-        if (vehicle == null) return;
-        var vehicleEntityData = vehicle.getEntityData();
-        var vehicleAttachment = vehicleEntityData.entityAttachment();
-        if (vehicleAttachment == null) return;
-        var playerAttachment = EntityRegistry.PLAYER.entityAttachment();
-        if (playerAttachment == null) return;
-        var vehicleAttachY = vehicle.getY() + vehicleAttachment.passenger();
-        var playerAttachY = playerAttachment.vehicle();
-        x = vehicle.getX();
-        y = vehicleAttachY - playerAttachY;
-        z = vehicle.getZ();
-        CACHE.getPlayerCache().getThePlayer().setX(x).setY(y).setZ(z);
     }
 
     public void onUpdateAbilities() {

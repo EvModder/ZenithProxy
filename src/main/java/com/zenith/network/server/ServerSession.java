@@ -18,9 +18,7 @@ import com.zenith.feature.spectator.entity.SpectatorEntity;
 import com.zenith.network.STimeoutTask;
 import com.zenith.network.codec.PacketCodecRegistries;
 import com.zenith.util.ComponentSerializer;
-import io.netty.channel.ChannelException;
 import io.netty.channel.EventLoop;
-import io.netty.handler.codec.DecoderException;
 import lombok.Getter;
 import lombok.Setter;
 import net.kyori.adventure.text.Component;
@@ -43,7 +41,6 @@ import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.scoreboard.
 import org.geysermc.mcprotocollib.protocol.packet.login.clientbound.ClientboundLoginDisconnectPacket;
 import org.jspecify.annotations.Nullable;
 
-import java.io.IOException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
@@ -205,6 +202,28 @@ public class ServerSession extends TcpServerSession {
         return isLoggedIn;
     }
 
+    private int packetsToFlush = 0;
+    public void proxyClientPacket(Packet packet) {
+        getEventLoop().execute(() -> {
+            if (!getChannel().isWritable()) { // will occur if our outbound buffer reaches the watermark
+                flush();
+                packetsToFlush = 0;
+            }
+            sendDelayed(packet);
+            if (++packetsToFlush >= 1024 || !getChannel().isWritable()) {
+                flush();
+                packetsToFlush = 0;
+            }
+        });
+    }
+
+    public void onClientChannelReadComplete() {
+        getEventLoop().execute(() -> {
+            flush();
+            packetsToFlush = 0;
+        });
+    }
+
     @Override
     public void callConnected() {
         getEventLoop().scheduleAtFixedRate(new STimeoutTask(this), 0L, 50L, TimeUnit.MILLISECONDS);
@@ -222,8 +241,11 @@ public class ServerSession extends TcpServerSession {
         EVENT_BUS.post(new PlayerConnectionRemovedEvent(this));
         var reasonStr = ComponentSerializer.serializePlain(reason);
         if (!this.isPlayer) {
-            if (getPacketProtocol().getOutboundState() == ProtocolState.STATUS || cause instanceof DecoderException || cause instanceof IOException || cause instanceof ChannelException) {
+            if (getPacketProtocol().getOutboundState() == ProtocolState.STATUS
+                || getPacketProtocol().getOutboundState() == ProtocolState.HANDSHAKE
+            ) {
                 // any scanners or TCP connections established result in a lot of these coming in even when they are not speaking mc protocol
+                SERVER_LOG.debug("Connection disconnected: {} : {}", getRemoteAddress(), reasonStr, cause);
                 return;
             }
             SERVER_LOG.info("Connection disconnected: {} : {}", getRemoteAddress(), reasonStr, cause);
