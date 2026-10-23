@@ -26,7 +26,7 @@ This is a fork by [EvModder](https://github.com/EvModder), adapted for my own pe
 - **Autofishing:** Reliable bite detection, two-attempt hooked-loot recovery, clearer warnings.
 - **Totem disconnect:** Checks pops and inventory updates without the one-second delay.
 - **Death notices:** Combines death location and death message into one notification.
-- **Replay notices:** Start/stop notices default off; uploads and failures remain visible (`replay notifyStartStop on/off`).
-- **Pearl alerts:** Long-distance teleports correlated with our own pearl damage, enabled while unattended (`pearlNotifications`). Coordinates follow Discord privacy settings.
+- **Replay notices:** Start/stop notices default off; uploads and failures remain visible.
+- **Pearl alerts:** Teleports correlated with pearl damage, enabled while unattended.
 
 To rfresh: Feel free to copy anything here you like, or DM for a PR.
