@@ -130,7 +130,8 @@ tasks {
                 "com/zenith/module/impl/AutoFishTest.class", "com/zenith/module/impl/AutoDisconnectTest.class",
                 "com/zenith/discord/EmbedDecorationTest.class", "com/zenith/discord/ReplayNotificationTest.class",
                 "com/zenith/discord/DeathNotificationsTest.class", "com/zenith/feature/player/PearlTeleportTrackerTest.class",
-                "com/zenith/feature/player/PearlDamageHandlerTest.class", "com/zenith/discord/PearlNotificationTest.class")
+                "com/zenith/feature/player/PearlDamageHandlerTest.class", "com/zenith/discord/PearlNotificationTest.class",
+                "com/zenith/discord/DiscordDescriptionTest.class")
         }
         workingDir = layout.projectDirectory.dir("run").asFile
         forkEvery = 1 // needed bc zenith uses global static state

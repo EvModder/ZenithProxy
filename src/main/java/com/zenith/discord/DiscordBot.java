@@ -47,9 +47,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -63,7 +65,8 @@ public class DiscordBot {
     private TextChannel mainChannel; // Null if not running
     private TextChannel relayChannel; // Null if not running or relay disabled
     private ScheduledFuture<?> presenceUpdateFuture;
-    @Getter private JDA jda; // Null if not running
+    private final AtomicReference<JDA> descriptionUpdatePending = new AtomicReference<>();
+    @Getter private volatile JDA jda; // Null if not running
     @Getter private final SimpleEventBus jdaEventBus = new SimpleEventBus();
     public Optional<Instant> lastRelayMessage = Optional.empty();
 
@@ -263,9 +266,13 @@ public class DiscordBot {
     }
 
     public void setBotDescription(String description) {
-        if (!isRunning()) return;
+        var client = jda;
+        if (client == null || !isRunning() || client.getStatus() == JDA.Status.SHUTTING_DOWN) return;
         try {
-            jda.getApplicationManager().setDescription(description).complete();
+            client.getApplicationManager().setDescription(description).queue(null, e -> {
+                DISCORD_LOG.warn("Failed updating bot's description: {}", e.getMessage());
+                DISCORD_LOG.debug("Failed updating bot's description", e);
+            });
         } catch (final Exception e) {
             DISCORD_LOG.warn("Failed updating bot's description: {}", e.getMessage());
             DISCORD_LOG.debug("Failed updating bot's description", e);
@@ -352,44 +359,67 @@ public class DiscordBot {
     }
 
     private void updateBotInfo2(String presence){
-        if (CONFIG.discord.manageDescription){
-            String oldDesc = jda.retrieveApplicationInfo().complete().getDescription();
-            String nameList = null;
-            String[] nameListArr = null;
-            int idx = oldDesc.indexOf('\n');
-            if(idx != -1){
-                nameList = oldDesc.substring(idx+1);
-                nameListArr = nameList.split("\\n");
-                // 1 in 10 chance of clearing nameList (proportional to # of bots)
-                if(ThreadLocalRandom.current().nextInt()%(5+10*nameListArr.length) == 0){
-                    nameList = null;
-                }
-            }
-            String myNameLineStart = "  " + CONFIG.authentication.username.substring(0, 3) + " ";
-            String myNameLine = myNameLineStart + (presence == null ? "" : presence);
-            if(nameList == null) nameList = "**Online**:\n" + myNameLine;
-            else{
-                // Insert into correct alphabetical position
-                StringBuilder builder = new StringBuilder("**Online:**");
-                boolean added = false;
-                for(String line : nameListArr){
-                    if(!added){
-                        if(line.startsWith(myNameLineStart)){
-                            added = true;
-                            builder.append('\n').append(myNameLine);
-                            continue;
-                        }
-                        if(line.compareTo(myNameLineStart) > 0){
-                            added = true;
-                            builder.append('\n').append(myNameLine);
+        // Discord rate limits must not block game events or accumulate periodic description updates.
+        var client = jda;
+        if (!CONFIG.discord.manageDescription || client == null || !isRunning()
+            || client.getStatus() == JDA.Status.SHUTTING_DOWN) return;
+        var pendingClient = descriptionUpdatePending.get();
+        if (jda == client && pendingClient != client && descriptionUpdatePending.compareAndSet(pendingClient, client)) {
+            try {
+                client.retrieveApplicationInfo().submit().thenCompose(info -> {
+                    if (jda != client || !isRunning() || client.getStatus() == JDA.Status.SHUTTING_DOWN
+                        || !CONFIG.discord.manageDescription)
+                        return CompletableFuture.<Void>completedFuture(null);
+                    String oldDesc = info.getDescription();
+                    String nameList = null;
+                    String[] nameListArr = null;
+                    int idx = oldDesc.indexOf('\n');
+                    if(idx != -1){
+                        nameList = oldDesc.substring(idx+1);
+                        nameListArr = nameList.split("\\n");
+                        // 1 in 10 chance of clearing nameList (proportional to # of bots)
+                        if(ThreadLocalRandom.current().nextInt()%(5+10*nameListArr.length) == 0){
+                            nameList = null;
                         }
                     }
-                    builder.append('\n').append(line);
-                }
-                if(!added) builder.append('\n').append(myNameLine);
-                nameList = builder.toString();
+                    String myNameLineStart = "  " + CONFIG.authentication.username.substring(0, 3) + " ";
+                    String myNameLine = myNameLineStart + (presence == null ? "" : presence);
+                    if(nameList == null) nameList = "**Online**:\n" + myNameLine;
+                    else{
+                        // Insert into correct alphabetical position
+                        StringBuilder builder = new StringBuilder("**Online**:");
+                        boolean added = false;
+                        for(String line : nameListArr){
+                            if(!added){
+                                if(line.startsWith(myNameLineStart)){
+                                    added = true;
+                                    builder.append('\n').append(myNameLine);
+                                    continue;
+                                }
+                                if(line.compareTo(myNameLineStart) > 0){
+                                    added = true;
+                                    builder.append('\n').append(myNameLine);
+                                }
+                            }
+                            builder.append('\n').append(line);
+                        }
+                        if(!added) builder.append('\n').append(myNameLine);
+                        nameList = builder.toString();
+                    }
+                    return oldDesc.equals(nameList) ? CompletableFuture.<Void>completedFuture(null)
+                        : client.getApplicationManager().setDescription(nameList).submit();
+                }).whenComplete((ignored, e) -> {
+                    descriptionUpdatePending.compareAndSet(client, null);
+                    if (e != null && jda == client && isRunning()) {
+                        DISCORD_LOG.warn("Failed updating bot's description: {}", e.getMessage());
+                        DISCORD_LOG.debug("Failed updating bot's description", e);
+                    }
+                });
+            } catch (final Exception e) {
+                descriptionUpdatePending.compareAndSet(client, null);
+                DISCORD_LOG.warn("Failed updating bot's description: {}", e.getMessage());
+                DISCORD_LOG.debug("Failed updating bot's description", e);
             }
-            DISCORD.setBotDescription(nameList);
         }
     }
     public void updateBotInfo() {
