@@ -58,6 +58,7 @@ public class ClientSession extends TcpClientSession {
     private boolean disconnected = true;
     // if we have been disconnected and this session cannot be reused
     private boolean terminalState = false;
+    private volatile boolean disconnecting = false;
     // profile we logged in with
     // MC servers can send a different profile back, which will be stored in `CACHE.getProfileCache()`
     private final GameProfile profile;
@@ -111,6 +112,7 @@ public class ClientSession extends TcpClientSession {
 
     @Override
     public void disconnect(Component reason, Throwable cause) {
+        disconnecting = true;
         if (getClientEventLoop().inEventLoop()) {
             var channel = getChannel();
             if (!disconnected && channel != null && channel.isActive() && !channel.eventLoop().isShuttingDown()) {
@@ -216,6 +218,7 @@ public class ClientSession extends TcpClientSession {
 
     @Override
     public void callDisconnecting(Component reason, Throwable cause) {
+        disconnecting = true;
         try {
             CLIENT_LOG.info("Disconnecting from server...");
             CLIENT_LOG.trace("Disconnect reason: {}", reason);

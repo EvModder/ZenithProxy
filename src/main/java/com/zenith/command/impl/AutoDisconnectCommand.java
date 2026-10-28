@@ -29,7 +29,9 @@ public class AutoDisconnectCommand extends Command {
             
             Modes:
             
-              * Health: Disconnects when health is below a set threshold level
+              * Health: Disconnects when health is at or below a set threshold level.
+                Non-priority health logouts pause this check until recovery or fresh damage.
+                Use `health on` to rearm it manually.
               * Thunder: Disconnects during thunderstorms (i.e. avoid lightning burning down bases)
               * Unknown Player: Disconnects when a player not on the friends list, whitelist, or spectator whitelist is in visual range
               * TotemPop: Disconnects when your totem is popped
@@ -70,6 +72,7 @@ public class AutoDisconnectCommand extends Command {
             .then(literal("health")
                 .then(argument("toggle", toggle()).executes(c -> {
                     CONFIG.client.extra.utility.actions.autoDisconnect.healthDisconnect = getToggle(c, "toggle");
+                    CONFIG.client.extra.utility.actions.autoDisconnect.healthDisconnectPaused = false;
                     c.getSource().getEmbed()
                         .title("Health Disconnect " + toggleStrCaps(CONFIG.client.extra.utility.actions.autoDisconnect.healthDisconnect));
                 }))
@@ -126,6 +129,7 @@ public class AutoDisconnectCommand extends Command {
         builder
             .addField("AutoDisconnect", toggleStr(CONFIG.client.extra.utility.actions.autoDisconnect.enabled))
             .addField("Health Disconnect", toggleStr(CONFIG.client.extra.utility.actions.autoDisconnect.healthDisconnect))
+            .addField("Health Check Paused", toggleStr(CONFIG.client.extra.utility.actions.autoDisconnect.healthDisconnectPaused))
             .addField("Health Level", CONFIG.client.extra.utility.actions.autoDisconnect.health)
             .addField("Thunder", toggleStr(CONFIG.client.extra.utility.actions.autoDisconnect.thunder))
             .addField("Unknown Player", toggleStr(CONFIG.client.extra.utility.actions.autoDisconnect.onUnknownPlayerInVisualRange))

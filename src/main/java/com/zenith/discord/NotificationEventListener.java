@@ -520,7 +520,19 @@ public class NotificationEventListener {
     }
 
     public void handleVisualRangeLeaveEvent(final VisualRangeLeaveEvent event) {
-        if(!Proxy.getInstance().getActiveConnections().isEmpty()) return;
+        // Entity removals and the upstream disconnect arrive through different async paths.
+        EXECUTOR.schedule(() -> sendVisualRangeLeaveEvent(event), 1, TimeUnit.SECONDS);
+    }
+
+    static boolean shouldNotifyVisualRangeLeave(VisualRangeLeaveEvent event) {
+        var session = event.session();
+        return session != null && session == Proxy.getInstance().getClient()
+            && session.isConnected() && session.isOnline() && !session.isDisconnecting()
+            && !session.isTerminalState() && Proxy.getInstance().getActiveConnections().isEmpty();
+    }
+
+    void sendVisualRangeLeaveEvent(final VisualRangeLeaveEvent event) {
+        if (!shouldNotifyVisualRangeLeave(event)) return;
         var embedCreateSpec = Embed.builder()
             .title("Player Left Visual Range of "+CONFIG.authentication.username)
             .color(event.isFriend() ? CONFIG.theme.success.color() : CONFIG.theme.error.color())

@@ -61,6 +61,9 @@ public class VisualRange extends Module {
     }
 
     public void handlePlayerLeftVisualRangeEvent(final ServerPlayerLeftVisualRangeEvent event) {
+        var session = event.session();
+        if (session == null || session != Proxy.getInstance().getClient() || session.isDisconnecting()
+            || !session.isConnected() || !session.isOnline()) return;
         var isFriend = PLAYER_LISTS.getFriendsList().contains(event.playerEntity().getUuid());
         if (CONFIG.client.extra.visualRange.replayRecording) {
             switch (CONFIG.client.extra.visualRange.replayRecordingMode) {
@@ -89,7 +92,7 @@ public class VisualRange extends Module {
         }
         if (CONFIG.client.extra.visualRange.leaveAlert) {
             warn("{} left visual range [{}, {}, {}]", event.playerEntry().getName(), event.playerEntity().getX(), event.playerEntity().getY(), event.playerEntity().getZ());
-            EVENT_BUS.post(new VisualRangeLeaveEvent(event.playerEntry(), event.playerEntity(), isFriend));
+            EVENT_BUS.post(new VisualRangeLeaveEvent(event.playerEntry(), event.playerEntity(), isFriend, session));
         }
     }
 

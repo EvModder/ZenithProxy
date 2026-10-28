@@ -1426,7 +1426,11 @@ Modes:
 
 
 
-  * Health: Disconnects when health is below a set threshold level
+  * Health: Disconnects when health is at or below a set threshold level.
+
+    Non-priority health logouts pause this check until recovery or fresh damage.
+
+    Use `health on` to rearm it manually.
 
   * Thunder: Disconnects during thunderstorms (i.e. avoid lightning burning down bases)
 

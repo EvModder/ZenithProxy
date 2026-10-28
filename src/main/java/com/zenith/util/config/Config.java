@@ -555,6 +555,8 @@ public final class Config {
                 public static final class AutoDisconnect {
                     public boolean enabled = false;
                     public boolean healthDisconnect = true;
+                    // Persist across reconnects/restarts; cleared by recovery, fresh damage, or an explicit health toggle.
+                    public boolean healthDisconnectPaused = false;
                     public boolean whilePlayerConnected = false;
                     public boolean autoClientDisconnect = false;
                     public int health = 5;

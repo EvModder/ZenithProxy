@@ -32,7 +32,8 @@ public class RemoveEntitiesHandler implements ClientEventLoopPacketHandler<Clien
                                 .get(player.getUuid())
                                 // todo: this packet seems to always be received first and we shouldn't hit the orElse, but this could change based on the server
                                 .orElse(new PlayerListEntry("", player.getUuid())),
-                            player
+                            player,
+                            session
                         ));
                     }
                 }
