@@ -2,7 +2,7 @@ package com.zenith.command.impl;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.zenith.command.api.*;
-import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundRemoveEntitiesPacket;
+import com.zenith.feature.spectator.SpectatorAppearance;
 
 import static com.zenith.util.ComponentSerializer.minimessage;
 
@@ -22,12 +22,7 @@ public class SpectatorEntityToggleCommand extends Command {
         return command("entityToggle").requires(c -> Command.validateCommandSource(c, CommandSources.SPECTATOR)).executes(c -> {
             var session = c.getSource().getInGamePlayerInfo().session();
             session.setShowSelfEntity(!session.isShowSelfEntity());
-            if (session.isShowSelfEntity()) {
-                session.sendAsync(session.getEntitySpawnPacket());
-                session.sendAsync(session.getEntityMetadataPacket());
-            } else {
-                session.sendAsync(new ClientboundRemoveEntitiesPacket(new int[]{session.getSpectatorEntityId()}));
-            }
+            SpectatorAppearance.spawn(session, session);
             session.sendAsyncMessage(minimessage("<blue>Show self entity toggled " + (session.isShowSelfEntity() ? "on!" : "off!")));
             c.getSource().setNoOutput(true);
         });

@@ -14,13 +14,14 @@ public abstract class SpectatorMob extends SpectatorEntity {
 
     @Override
     public Packet getSpawnPacket(final int entityId, final UUID uuid, final PlayerCache playerCache, final GameProfile gameProfile) {
+        var position = getRenderPosition(playerCache);
         return new ClientboundAddEntityPacket(
             entityId,
             uuid,
             getType(),
-            playerCache.getX(),
-            playerCache.getY(),
-            playerCache.getZ(),
+            position.getX(),
+            position.getY(),
+            position.getZ(),
             playerCache.getYaw(),
             playerCache.getYaw(), // todo: head yaw
             playerCache.getPitch());

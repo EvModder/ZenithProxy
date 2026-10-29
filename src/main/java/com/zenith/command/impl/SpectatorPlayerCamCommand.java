@@ -6,7 +6,6 @@ import com.zenith.cache.data.entity.Entity;
 import com.zenith.command.api.*;
 import com.zenith.feature.spectator.SpectatorSync;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundSetCameraPacket;
-import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundRemoveEntitiesPacket;
 
 import static com.zenith.Globals.CACHE;
 import static com.zenith.util.ComponentSerializer.minimessage;
@@ -37,7 +36,7 @@ public class SpectatorPlayerCamCommand extends Command {
                 var connections = Proxy.getInstance().getActiveConnections().getArray();
                 for (int i = 0; i < connections.length; i++) {
                     var connection = connections[i];
-                    connection.sendAsync(new ClientboundRemoveEntitiesPacket(new int[]{session.getSpectatorEntityId()}));
+                    connection.sendAsync(session.getEntityRemovalPacket());
                 }
                 session.sendAsyncMessage(minimessage("<blue>Entered playercam!"));
             }

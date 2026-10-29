@@ -5,6 +5,7 @@ import com.viaversion.viaversion.platform.ViaCodecHandler;
 import com.zenith.Proxy;
 import com.zenith.cache.DataCache;
 import com.zenith.event.player.PlayerLoginEvent;
+import com.zenith.feature.spectator.SpectatorAppearance;
 import com.zenith.network.codec.PostOutgoingPacketHandler;
 import com.zenith.network.server.ServerSession;
 import com.zenith.via.ZenithViaInitializer;
@@ -37,8 +38,7 @@ public class LoginPostHandler implements PostOutgoingPacketHandler<ClientboundLo
             var connection = connections[i];
             if (connection.equals(session)) continue;
             if (connection.hasCameraTarget()) continue;
-            session.send(connection.getEntitySpawnPacket());
-            session.send(connection.getEntityMetadataPacket());
+            SpectatorAppearance.spawn(connection, session);
         }
         if (CONFIG.server.welcomeMessages) {
             if (CONFIG.client.extra.chat.hideChat) {

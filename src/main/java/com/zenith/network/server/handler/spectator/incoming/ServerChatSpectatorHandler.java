@@ -4,13 +4,13 @@ import com.viaversion.viaversion.api.protocol.version.ProtocolVersion;
 import com.zenith.Proxy;
 import com.zenith.cache.data.entity.Entity;
 import com.zenith.event.message.PrivateMessageSendEvent;
+import com.zenith.feature.spectator.SpectatorAppearance;
 import com.zenith.feature.spectator.SpectatorEntityRegistry;
 import com.zenith.feature.spectator.SpectatorSync;
 import com.zenith.network.codec.PacketHandler;
 import com.zenith.network.server.ServerSession;
 import net.kyori.adventure.text.Component;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundSetCameraPacket;
-import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundRemoveEntitiesPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.serverbound.ServerboundChatPacket;
 
 import static com.zenith.Globals.*;
@@ -72,29 +72,14 @@ public class ServerChatSpectatorHandler implements PacketHandler<ServerboundChat
             }
             case "etoggle" -> {
                 session.setShowSelfEntity(!session.isShowSelfEntity());
-                if (session.isShowSelfEntity()) {
-                    session.send(session.getEntitySpawnPacket());
-                    session.send(session.getEntityMetadataPacket());
-                } else {
-                    session.send(new ClientboundRemoveEntitiesPacket(new int[]{session.getSpectatorEntityId()}));
-                }
+                SpectatorAppearance.spawn(session, session);
                 session.sendAsyncMessage(minimessage("<blue>Show self entity toggled " + (session.isShowSelfEntity() ? "on!" : "off!")));
             }
             case "e" -> {
                 String entityId = fullCommandAndArgs.substring(1).trim();
                 boolean spectatorEntitySet = session.setSpectatorEntity(entityId);
                 if (spectatorEntitySet) {
-                    // respawn entity on all connections
-                    var connections = Proxy.getInstance().getActiveConnections().getArray();
-                    for (int i = 0; i < connections.length; i++) {
-                        var connection = connections[i];
-                        connection.send(new ClientboundRemoveEntitiesPacket(new int[]{session.getSpectatorEntityId()}));
-                        if (!connection.equals(session) || session.isShowSelfEntity()) {
-                            connection.send(session.getEntitySpawnPacket());
-                            connection.send(session.getEntityMetadataPacket());
-                            SpectatorSync.updateSpectatorPosition(session);
-                        }
-                    }
+                    SpectatorAppearance.refresh(session);
                     session.sendAsyncMessage(minimessage("<blue>Updated entity to: " + entityId));
                 } else {
                     session.sendAsyncMessage(minimessage("<red>No entity found with id: " + entityId));
@@ -114,7 +99,7 @@ public class ServerChatSpectatorHandler implements PacketHandler<ServerboundChat
                     var connections = Proxy.getInstance().getActiveConnections().getArray();
                     for (int i = 0; i < connections.length; i++) {
                         var connection = connections[i];
-                        connection.send(new ClientboundRemoveEntitiesPacket(new int[]{session.getSpectatorEntityId()}));
+                        connection.send(session.getEntityRemovalPacket());
                     }
                     session.sendAsyncMessage(minimessage("<blue>Entered playercam!"));
                 }

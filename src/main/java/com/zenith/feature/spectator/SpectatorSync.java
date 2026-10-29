@@ -8,17 +8,13 @@ import com.zenith.cache.data.entity.EntityPlayer;
 import com.zenith.feature.spectator.entity.mob.SpectatorEntityEnderDragon;
 import com.zenith.feature.spectator.entity.mob.SpectatorEntityPlayerHead;
 import com.zenith.network.server.ServerSession;
-import com.zenith.util.math.MathHelper;
 import org.geysermc.mcprotocollib.network.packet.Packet;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.MetadataTypes;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.type.ByteEntityMetadata;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.type.FloatEntityMetadata;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.BlockBreakStage;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundSetCameraPacket;
-import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundRemoveEntitiesPacket;
-import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundRotateHeadPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundSetEntityDataPacket;
-import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundTeleportEntityPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.player.ClientboundPlayerPositionPacket;
 
 import java.util.ArrayList;
@@ -59,14 +55,10 @@ public final class SpectatorSync {
             spectConnection.getSpectatorPlayerCache().getYaw(),
             spectConnection.getSpectatorPlayerCache().getPitch()
         ));
-        updateSpectatorPosition(spectConnection);
         var connections = Proxy.getInstance().getActiveConnections().getArray();
         for (int i = 0; i < connections.length; i++) {
             var connection = connections[i];
-            if (!connection.equals(spectConnection) || spectConnection.isShowSelfEntity()) {
-                connection.sendAsync(spectConnection.getEntitySpawnPacket());
-                connection.sendAsync(spectConnection.getEntityMetadataPacket());
-            }
+            SpectatorAppearance.spawn(spectConnection, connection);
         }
     }
 
@@ -80,11 +72,9 @@ public final class SpectatorSync {
 
     private static void spawnSpectatorForOtherSessions(ServerSession spectatorSession, ServerSession connection) {
         if (!connection.equals(Proxy.getInstance().getCurrentPlayer().get())) {
-            spectatorSession.sendAsync(connection.getEntitySpawnPacket());
-            spectatorSession.sendAsync(connection.getEntityMetadataPacket());
+            SpectatorAppearance.spawn(connection, spectatorSession);
         }
-        connection.sendAsync(spectatorSession.getEntitySpawnPacket());
-        connection.sendAsync(spectatorSession.getEntityMetadataPacket());
+        SpectatorAppearance.spawn(spectatorSession, connection);
     }
 
     public static EntityPlayer getSpectatorPlayerEntity(final ServerSession session) {
@@ -125,8 +115,7 @@ public final class SpectatorSync {
             .setMaxPlayers(CACHE.getPlayerCache().getMaxPlayers());
         DataCache.sendCacheData(cacheSupplier.get(), session);
         SpectatorInventory.sync(session);
-        session.sendAsync(session.getEntitySpawnPacket());
-        session.sendAsync(session.getSelfEntityMetadataPacket());
+        SpectatorAppearance.spawn(session, session);
         SpectatorPacketProvider.playerSpawn().forEach(session::sendAsync);
         SpectatorPacketProvider.playerPose().forEach(session::sendAsync);
         var connections = Proxy.getInstance().getActiveConnections().getArray();
@@ -156,43 +145,7 @@ public final class SpectatorSync {
         if (selfSession.hasCameraTarget()) {
             return;
         }
-        double playerEyeHeight = 1.6;
-        double specEntityEyeHeight = selfSession.getSpectatorEntity().getEyeHeight();
-        double specEntityTotalWidth = selfSession.getSpectatorEntity().getWidth();
-        // clamping avoids moving the spectator entity directly in view of the player in 1st person at steep pitches
-        float clampedPitch = MathHelper.clamp(selfSession.getSpectatorPlayerCache().getPitch(), -30, 30);
-
-        double distance = (specEntityTotalWidth * -0.5) - 0.5;
-        double yawRadians = Math.toRadians(selfSession.getSpectatorPlayerCache().getYaw());
-        double pitchRadians = Math.toRadians(clampedPitch);
-
-        double xOffset = -Math.sin(yawRadians) * Math.cos(pitchRadians) * distance;
-        double yOffset = -Math.sin(pitchRadians) * distance;
-        double zOffset = Math.cos(yawRadians) * Math.cos(pitchRadians) * distance;
-
-        double newX = selfSession.getSpectatorPlayerCache().getX() + xOffset;
-        double newY = selfSession.getSpectatorPlayerCache().getY() + playerEyeHeight - specEntityEyeHeight + yOffset;
-        double newZ = selfSession.getSpectatorPlayerCache().getZ() + zOffset;
-        var connections = Proxy.getInstance().getActiveConnections().getArray();
-        for (int i = 0; i < connections.length; i++) {
-            var connection = connections[i];
-            connection.sendAsync(new ClientboundTeleportEntityPacket(
-                selfSession.getSpectatorEntityId(),
-                newX,
-                newY,
-                newZ,
-                0,
-                0,
-                0,
-                getDisplayYaw(selfSession),
-                getDisplayPitch(selfSession),
-                false
-            ));
-            connection.sendAsync(new ClientboundRotateHeadPacket(
-                selfSession.getSpectatorEntityId(),
-                getDisplayYaw(selfSession)
-            ));
-        }
+        SpectatorAppearance.moveAll(selfSession);
     }
 
     public static void sendPlayerPose() {
@@ -224,10 +177,11 @@ public final class SpectatorSync {
                         var connections = Proxy.getInstance().getActiveConnections().getArray();
                         for (int j = 0; j < connections.length; j++) {
                             var session = connections[j];
-                            session.sendAsync(new ClientboundRemoveEntitiesPacket(new int[]{connection.getSpectatorEntityId()}));
+                            session.sendAsync(connection.getEntityRemovalPacket());
                         }
                     } else { // don't try to go back to playercam if its to a different entity
                         connection.setCameraTarget(null);
+                        SpectatorAppearance.refresh(connection);
                     }
                 }
             }

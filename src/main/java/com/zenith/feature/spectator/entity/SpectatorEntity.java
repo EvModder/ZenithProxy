@@ -1,7 +1,9 @@
 package com.zenith.feature.spectator.entity;
 
 import com.zenith.cache.data.PlayerCache;
+import com.zenith.util.math.MathHelper;
 import net.kyori.adventure.text.Component;
+import org.cloudburstmc.math.vector.Vector3d;
 import org.geysermc.mcprotocollib.auth.GameProfile;
 import org.geysermc.mcprotocollib.network.packet.Packet;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.metadata.EntityMetadata;
@@ -30,6 +32,17 @@ public abstract class SpectatorEntity {
     // Optionally overridden by base classes
     public Optional<Packet> getSoundPacket(final PlayerCache playerCache) {
         return Optional.empty();
+    }
+
+    public Vector3d getRenderPosition(final PlayerCache playerCache) {
+        // Keep the existing camera clearance for appearances without a model-specific anchor.
+        double pitch = Math.toRadians(MathHelper.clamp(playerCache.getPitch(), -30, 30));
+        double yaw = Math.toRadians(playerCache.getYaw());
+        double distance = getWidth() * -0.5 - 0.5;
+        return Vector3d.from(
+            playerCache.getX() - Math.sin(yaw) * Math.cos(pitch) * distance,
+            playerCache.getY() + 1.6 - getEyeHeight() - Math.sin(pitch) * distance,
+            playerCache.getZ() + Math.cos(yaw) * Math.cos(pitch) * distance);
     }
 
     /** Internal API **/

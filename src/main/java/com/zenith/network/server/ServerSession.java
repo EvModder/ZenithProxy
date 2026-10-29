@@ -34,6 +34,7 @@ import org.geysermc.mcprotocollib.protocol.data.game.scoreboard.TeamAction;
 import org.geysermc.mcprotocollib.protocol.data.game.scoreboard.TeamColor;
 import org.geysermc.mcprotocollib.protocol.packet.common.clientbound.ClientboundDisconnectPacket;
 import org.geysermc.mcprotocollib.protocol.packet.common.clientbound.ClientboundTransferPacket;
+import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundDelimiterPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundSystemChatPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundRemoveEntitiesPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundSetEntityDataPacket;
@@ -47,8 +48,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 import static com.zenith.Globals.*;
@@ -56,6 +57,7 @@ import static com.zenith.Globals.*;
 @Getter
 @Setter
 public class ServerSession extends TcpServerSession {
+    private static final AtomicInteger SPECTATOR_ENTITY_IDS = new AtomicInteger(Integer.MAX_VALUE);
     private static final KeyPair KEY_PAIR;
     static {
         try {
@@ -110,9 +112,11 @@ public class ServerSession extends TcpServerSession {
     // allow spectator to set their camera to client
     // need to persist state to allow them in and out of this
     protected Entity cameraTarget = null;
-    protected boolean showSelfEntity = true;
-    protected int spectatorEntityId = 2147483647 - ThreadLocalRandom.current().nextInt(1000000);
+    protected boolean showSelfEntity = false;
+    protected int spectatorEntityId = SPECTATOR_ENTITY_IDS.getAndAdd(-3);
     protected int spectatorSelfEntityId = spectatorEntityId - 1;
+    protected int spectatorHeadEntityId = spectatorEntityId - 2;
+    protected UUID spectatorHeadUUID = UUID.randomUUID();
     protected UUID spectatorEntityUUID = UUID.randomUUID();
     protected ServerProfileCache profileCache = new ServerProfileCache();
     protected ServerProfileCache spectatorFakeProfileCache = new ServerProfileCache();
@@ -203,6 +207,28 @@ public class ServerSession extends TcpServerSession {
     }
 
     private int packetsToFlush = 0;
+
+    /** Applies an entity update together on modern clients, retaining per-packet outbound handlers. */
+    public void sendEntityUpdate(List<Packet> packets) {
+        var snapshot = List.copyOf(packets);
+        if (snapshot.isEmpty()) return;
+        if (snapshot.size() > 4096) throw new IllegalArgumentException("Entity update exceeds bundle limit");
+        var channel = getChannel();
+        if (channel == null || !channel.isActive()) return;
+        channel.eventLoop().execute(() -> {
+            // Check after queueing: the viewer may have disconnected or entered reconfiguration.
+            if (!channel.isActive() || getPacketProtocol().getOutboundState() != ProtocolState.GAME) return;
+            boolean bundle = snapshot.size() > 1 && getProtocolVersion().newerThanOrEqualTo(ProtocolVersion.v1_19_4);
+            if (bundle) sendDelayedDirect(new ClientboundDelimiterPacket());
+            try {
+                for (var packet : snapshot) sendDelayed(packet);
+            } finally {
+                if (bundle) sendDelayedDirect(new ClientboundDelimiterPacket());
+                flush();
+            }
+        });
+    }
+
     public void proxyClientPacket(Packet packet) {
         getEventLoop().execute(() -> {
             if (!getChannel().isWritable()) { // will occur if our outbound buffer reaches the watermark
@@ -278,7 +304,7 @@ public class ServerSession extends TcpServerSession {
             var connections = Proxy.getInstance().getActiveConnections().getArray();
             for (int i = 0; i < connections.length; i++) {
                 var connection = connections[i];
-                connection.send(new ClientboundRemoveEntitiesPacket(new int[]{this.spectatorEntityId}));
+                connection.send(getEntityRemovalPacket());
                 connection.sendAsyncAlert("<red>" + getName() + " disconnected from spectator");
             }
             EVENT_BUS.postAsync(new SpectatorDisconnectedEvent(this, profileCache.getProfile()));
@@ -339,6 +365,10 @@ public class ServerSession extends TcpServerSession {
     }
 
     // Spectator helper methods
+
+    public ClientboundRemoveEntitiesPacket getEntityRemovalPacket() {
+        return new ClientboundRemoveEntitiesPacket(new int[]{spectatorEntityId, spectatorHeadEntityId});
+    }
 
     public Packet getEntitySpawnPacket() {
         return spectatorEntity.getSpawnPacket(spectatorEntityId, spectatorEntityUUID, spectatorPlayerCache, spectatorFakeProfileCache.getProfile());

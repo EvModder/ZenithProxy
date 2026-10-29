@@ -10,7 +10,6 @@ import org.geysermc.mcprotocollib.protocol.data.game.PlayerListEntryAction;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundLoginPacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundPlayerInfoUpdatePacket;
 import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.ClientboundSetCameraPacket;
-import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundRemoveEntitiesPacket;
 import org.jspecify.annotations.NonNull;
 
 import java.util.EnumSet;
@@ -69,7 +68,7 @@ public class LoginSpectatorPostHandler implements PostOutgoingPacketHandler<Clie
             var sessions = Proxy.getInstance().getActiveConnections().getArray();
             for (int i = 0; i < sessions.length; i++) {
                 var connection = sessions[i];
-                connection.sendAsync(new ClientboundRemoveEntitiesPacket(new int[]{session.getSpectatorEntityId()}));
+                connection.sendAsync(session.getEntityRemovalPacket());
             }
         }
         // send command help

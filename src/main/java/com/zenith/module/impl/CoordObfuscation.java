@@ -121,10 +121,12 @@ public class CoordObfuscation extends Module {
 
     private void onSpectatorDisconnected(SpectatorDisconnectedEvent event) {
         spectatorEntityIds.remove(event.serverSession().getSpectatorEntityId());
+        spectatorEntityIds.remove(event.serverSession().getSpectatorHeadEntityId());
     }
 
     private void onSpectatorConnected(SpectatorConnectedEvent event) {
         spectatorEntityIds.add(event.session().getSpectatorEntityId());
+        spectatorEntityIds.add(event.session().getSpectatorHeadEntityId());
     }
 
     private void checkNearBlockOffsets(ClientTickEvent event) {

@@ -1,11 +1,9 @@
 package com.zenith.command.impl;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.zenith.Proxy;
 import com.zenith.command.api.*;
+import com.zenith.feature.spectator.SpectatorAppearance;
 import com.zenith.feature.spectator.SpectatorEntityRegistry;
-import com.zenith.feature.spectator.SpectatorSync;
-import org.geysermc.mcprotocollib.protocol.packet.ingame.clientbound.entity.ClientboundRemoveEntitiesPacket;
 
 import static com.mojang.brigadier.arguments.StringArgumentType.getString;
 import static com.zenith.util.ComponentSerializer.minimessage;
@@ -38,17 +36,7 @@ public class SpectatorEntityCommand extends Command {
                 var session = c.getSource().getInGamePlayerInfo().session();
                 boolean spectatorEntitySet = session.setSpectatorEntity(entityId);
                 if (spectatorEntitySet) {
-                    // respawn entity on all connections
-                    var connections = Proxy.getInstance().getActiveConnections().getArray();
-                    for (int i = 0; i < connections.length; i++) {
-                        var connection = connections[i];
-                        connection.sendAsync(new ClientboundRemoveEntitiesPacket(new int[]{session.getSpectatorEntityId()}));
-                        if (!connection.equals(session) || session.isShowSelfEntity()) {
-                            connection.sendAsync(session.getEntitySpawnPacket());
-                            connection.sendAsync(session.getEntityMetadataPacket());
-                            SpectatorSync.updateSpectatorPosition(session);
-                        }
-                    }
+                    SpectatorAppearance.refresh(session);
                     session.sendAsyncMessage(minimessage("<blue>Updated entity to: " + entityId));
                 } else {
                     session.sendAsyncMessage(minimessage("<red>No entity found with id: " + entityId));
