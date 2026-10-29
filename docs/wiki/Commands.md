@@ -1522,6 +1522,12 @@ Automatically eats food when health or hunger is below a set threshold.
 
 
 
+Uses consumable offhand food first, then held or other hotbar food without moving it.
+
+Restores the previous item after eating, including temporary main-inventory swaps.
+
+
+
 Which foods to eat can be configured based on modes:
 
 

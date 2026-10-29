@@ -5,20 +5,27 @@ import com.zenith.Proxy;
 import com.zenith.event.client.ClientBotTick;
 import com.zenith.event.module.AutoEatOutOfFoodEvent;
 import com.zenith.feature.inventory.InventoryActionRequest;
+import com.zenith.feature.inventory.actions.InventoryAction;
+import com.zenith.feature.inventory.actions.MoveToHotbarSlot;
+import com.zenith.feature.inventory.actions.SetHeldItem;
 import com.zenith.feature.inventory.util.InventoryUtil;
 import com.zenith.feature.player.ClickTarget;
 import com.zenith.feature.player.Input;
 import com.zenith.feature.player.InputRequest;
 import com.zenith.mc.food.FoodData;
 import com.zenith.mc.food.FoodRegistry;
+import com.zenith.mc.item.ItemRegistry;
 import com.zenith.util.RequestFuture;
+import org.geysermc.mcprotocollib.protocol.codec.MinecraftPacket;
 import org.geysermc.mcprotocollib.protocol.data.game.entity.player.GameMode;
+import org.geysermc.mcprotocollib.protocol.data.game.inventory.MoveToHotbarAction;
 import org.geysermc.mcprotocollib.protocol.data.game.item.ItemStack;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import static com.github.rfresh2.EventConsumer.of;
 import static com.zenith.Globals.*;
@@ -28,6 +35,10 @@ public class AutoEat extends AbstractInventoryModule {
     private Instant lastAutoEatOutOfFoodWarning = Instant.EPOCH;
     private boolean isEating = false;
     RequestFuture swapFuture = RequestFuture.rejected;
+    private FoodSelection foodSelection;
+    private int selectionGeneration;
+
+    private record FoodSelection(int previousSlot, int foodSlot, int sourceSlot, ItemStack displaced, int foodId) {}
 
     public AutoEat() {
         super(HandRestriction.EITHER, 0);
@@ -69,12 +80,16 @@ public class AutoEat extends AbstractInventoryModule {
                 }
                 return;
             }
-            isEating = false;
             if (!swapFuture.isDone()) {
                 INPUTS.submit(InputRequest.noInput(this, getPriority()));
                 return;
             }
+            if (isEating) {
+                if (restoreFoodSelection()) return;
+                isEating = false;
+            }
             if (!playerHealthBelowThreshold()) {
+                restoreFoodSelection();
                 return;
             }
             var invActionResult = doInventoryActionsV2();
@@ -97,18 +112,101 @@ public class AutoEat extends AbstractInventoryModule {
                 }
                 case SWAPPING -> {
                     swapFuture = invActionResult.inventoryActionFuture();
+                    INPUTS.submit(InputRequest.noInput(this, getPriority()));
                 }
                 default -> throw new IllegalStateException("Unexpected action state: " + invActionResult.state());
             }
         } else {
             isEating = false;
             delay = 0;
+            foodSelection = null;
+            selectionGeneration++;
         }
+    }
+
+    @Override
+    public InventoryActionResult doInventoryActionsV2() {
+        if (isItemEquipped())
+            return new InventoryActionResult(ActionState.ITEM_IN_HAND, RequestFuture.rejected, 0);
+        if (restoreFoodSelection())
+            return new InventoryActionResult(ActionState.SWAPPING, swapFuture, 0);
+        int source = InventoryUtil.searchPlayerInventory(this::hasFood);
+        if (source < 9 || source > 44)
+            return new InventoryActionResult(ActionState.NO_ITEM, RequestFuture.rejected, 0);
+        var inventory = CACHE.getPlayerCache().getPlayerInventory();
+        int previousSlot = CACHE.getPlayerCache().getHeldItemSlot();
+        int foodSlot = source >= 36 ? source - 36 : previousSlot;
+        var food = inventory.get(source);
+        var displaced = inventory.get(foodSlot + 36);
+        int generation = selectionGeneration;
+        var action = source >= 36 ? new SetHeldItem(foodSlot)
+            : new MoveToHotbarSlot(source, MoveToHotbarAction.from(foodSlot));
+        var future = submitFoodAction(() -> {
+            var currentInventory = CACHE.getPlayerCache().getPlayerInventory();
+            if (generation != selectionGeneration || Proxy.getInstance().hasActivePlayer()
+                || CACHE.getPlayerCache().getHeldItemSlot() != previousSlot
+                || !Objects.equals(currentInventory.get(source), food)
+                || !Objects.equals(currentInventory.get(foodSlot + 36), displaced)) return null;
+            var packet = action.packet();
+            if (packet != null) foodSelection = new FoodSelection(previousSlot, foodSlot, source, displaced, food.getId());
+            return packet;
+        });
+        return new InventoryActionResult(ActionState.SWAPPING, future, 0);
+    }
+
+    boolean restoreFoodSelection() {
+        var selection = foodSelection;
+        if (selection == null) return false;
+        INPUTS.submit(InputRequest.noInput(this, getPriority()));
+        swapFuture = submitFoodAction(() -> {
+            if (foodSelection != selection || Proxy.getInstance().hasActivePlayer()) return null;
+            var inventory = CACHE.getPlayerCache().getPlayerInventory();
+            InventoryAction action;
+            if (selection.sourceSlot() >= 36) {
+                if (CACHE.getPlayerCache().getHeldItemSlot() != selection.foodSlot()) {
+                    foodSelection = null;
+                    return null;
+                }
+                action = new SetHeldItem(selection.previousSlot());
+            } else {
+                var remaining = inventory.get(selection.foodSlot() + 36);
+                if (remaining == null && selection.displaced() == null) {
+                    foodSelection = null;
+                    return null;
+                }
+                // Consumption may leave an empty slot, a bowl, or a bottle. Do not swap unrelated items.
+                if (!Objects.equals(inventory.get(selection.sourceSlot()), selection.displaced())
+                    || (remaining != null && remaining.getId() != selection.foodId()
+                        && remaining.getId() != ItemRegistry.BOWL.id()
+                        && remaining.getId() != ItemRegistry.GLASS_BOTTLE.id())) {
+                    foodSelection = null;
+                    return null;
+                }
+                action = new MoveToHotbarSlot(selection.sourceSlot(), MoveToHotbarAction.from(selection.foodSlot()));
+            }
+            var packet = action.packet();
+            if (packet != null) foodSelection = null;
+            return packet;
+        });
+        return true;
+    }
+
+    private RequestFuture submitFoodAction(Supplier<MinecraftPacket> packet) {
+        return submitInventoryAction(new InventoryAction() {
+            @Override public int containerId() { return 0; }
+            @Override public MinecraftPacket packet() { return packet.get(); }
+        });
+    }
+
+    RequestFuture submitInventoryAction(InventoryAction action) {
+        return INVENTORY.submit(InventoryActionRequest.builder()
+            .owner(this).actions(action).priority(getPriority()).build());
     }
 
     void startEating() {
         if (!isItemEquipped()) return;
         var hand = getHand();
+        int generation = selectionGeneration;
         INPUTS.submit(InputRequest.builder()
                 .owner(this)
                 .input(Input.builder()
@@ -120,6 +218,7 @@ public class AutoEat extends AbstractInventoryModule {
                 .priority(getPriority())
                 .build())
             .addInputExecutedListener(future -> {
+                if (generation != selectionGeneration) return;
                 isEating = true;
                 delay = 50;
             });
@@ -146,6 +245,8 @@ public class AutoEat extends AbstractInventoryModule {
         lastAutoEatOutOfFoodWarning = Instant.EPOCH;
         isEating = false;
         swapFuture = RequestFuture.rejected;
+        foodSelection = null;
+        selectionGeneration++;
     }
 
     boolean playerHealthBelowThreshold() {
