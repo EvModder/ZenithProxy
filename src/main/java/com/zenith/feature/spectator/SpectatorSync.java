@@ -34,6 +34,7 @@ public final class SpectatorSync {
 
     public static void syncPlayerEquipmentWithSpectatorsFromCache() {
         sendSpectatorsEquipment();
+        SpectatorInventory.syncAll();
     }
 
     public static void syncPlayerPositionWithSpectators() {
@@ -123,6 +124,7 @@ public final class SpectatorSync {
             .setOpLevel(CACHE.getPlayerCache().getOpLevel())
             .setMaxPlayers(CACHE.getPlayerCache().getMaxPlayers());
         DataCache.sendCacheData(cacheSupplier.get(), session);
+        SpectatorInventory.sync(session);
         session.sendAsync(session.getEntitySpawnPacket());
         session.sendAsync(session.getSelfEntityMetadataPacket());
         SpectatorPacketProvider.playerSpawn().forEach(session::sendAsync);

@@ -28,6 +28,7 @@ This is a fork by [EvModder](https://github.com/EvModder), adapted for my own pe
 - **Totem disconnect:** Checks pops and inventory updates without the one-second delay.
 - **Health disconnect:** Non-priority health logouts pause repeat checks until recovery or fresh damage.
 - **Visual range:** Suppresses leave notices caused by our own logout.
+- **Spectator inventory:** Live, read-only account inventory, default on (`spectator inventory off` to hide).
 - **Death notices:** Combines death location and death message into one notification.
 - **Replay notices:** Start/stop notices default off; uploads and failures remain visible.
 - **Pearl alerts:** Teleports correlated with pearl damage, enabled while unattended.

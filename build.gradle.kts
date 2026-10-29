@@ -134,6 +134,7 @@ tasks {
                 "com/zenith/discord/DiscordDescriptionTest.class")
             include("com/zenith/discord/VisualRangeLeaveTest.class", "com/zenith/discord/DisconnectNotificationTest.class")
             include("com/zenith/module/impl/AutoEatTest.class")
+            include("com/zenith/feature/spectator/SpectatorInventoryTest.class")
         }
         workingDir = layout.projectDirectory.dir("run").asFile
         forkEvery = 1 // needed bc zenith uses global static state

@@ -816,6 +816,7 @@ public final class Config {
             public boolean fullCommandsRequireRegularWhitelist = true;
             public boolean fullCommandsServerCommands = true;
             public boolean playerCamOnJoin = false;
+            public boolean inventory = true;
             public boolean whitelistEnabled = true;
             public ArrayList<PlayerEntry> whitelist = new ArrayList<>();
         }

@@ -1,5 +1,6 @@
 package com.zenith.network.codec;
 
+import com.zenith.feature.spectator.SpectatorInventory;
 import com.zenith.network.client.handler.incoming.*;
 import com.zenith.network.client.handler.incoming.entity.*;
 import com.zenith.network.client.handler.incoming.inventory.*;
@@ -90,6 +91,8 @@ public final class PacketCodecRegistries {
         ClientboundPlayerAbilitiesPacket.class,
         ClientboundPlayerPositionPacket.class,
         ClientboundSetHeldSlotPacket.class,
+        ClientboundSetPlayerInventoryPacket.class,
+        ClientboundSetCursorItemPacket.class,
         ClientboundSetExperiencePacket.class,
         ClientboundSetHealthPacket.class
     );
@@ -281,6 +284,10 @@ public final class PacketCodecRegistries {
             .state(ProtocolState.GAME, PacketHandlerStateCodec.serverBuilder()
                 .allowUnhandledInbound(false)
                 .inbound(ServerboundMovePlayerPosRotPacket.class, new PlayerPositionRotationSpectatorHandler())
+                .inbound(ServerboundContainerClickPacket.class, SpectatorInventory::rejectEdit)
+                .inbound(ServerboundSetCreativeModeSlotPacket.class, SpectatorInventory::rejectEdit)
+                .inbound(ServerboundSetCarriedItemPacket.class, SpectatorInventory::rejectEdit)
+                .inbound(ServerboundPlayerActionPacket.class, SpectatorInventory::rejectEdit)
                 .inbound(ServerboundMovePlayerPosPacket.class, new PlayerPositionSpectatorHandler())
                 .inbound(ServerboundMovePlayerRotPacket.class, new PlayerRotationSpectatorHandler())
                 .inbound(ServerboundChatPacket.class, new ServerChatSpectatorHandler())

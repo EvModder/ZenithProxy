@@ -21,6 +21,7 @@ import com.zenith.feature.autoupdater.RestAutoUpdater;
 import com.zenith.feature.chatschema.ChatSchemaParser;
 import com.zenith.feature.queue.Queue;
 import com.zenith.feature.skin.SkinRetriever;
+import com.zenith.feature.spectator.SpectatorInventory;
 import com.zenith.module.impl.AutoReconnect;
 import com.zenith.network.client.Authenticator;
 import com.zenith.network.client.ClientSession;
@@ -825,6 +826,7 @@ public class Proxy {
 
     public void handleDisconnectEvent(ClientDisconnectEvent event) {
         CACHE.reset(CacheResetType.FULL);
+        SpectatorInventory.syncAll();
         this.disconnectTime = Instant.now();
         this.prevOnlineSeconds = inQueue
             ? OptionalLong.empty()

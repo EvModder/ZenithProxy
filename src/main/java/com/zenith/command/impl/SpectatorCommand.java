@@ -9,6 +9,7 @@ import com.zenith.command.api.CommandContext;
 import com.zenith.command.api.CommandUsage;
 import com.zenith.discord.Embed;
 import com.zenith.feature.spectator.SpectatorEntityRegistry;
+import com.zenith.feature.spectator.SpectatorInventory;
 import com.zenith.feature.spectator.entity.SpectatorEntity;
 
 import java.util.ArrayList;
@@ -37,6 +38,9 @@ public class SpectatorCommand extends Command {
 
             Spectator entities control what entity is used to represent spectators in-game.
 
+            `inventory on` mirrors the proxy account's live inventory to spectators, read-only.
+            Defaults on. Does not expose open container screens or allow spectator inventory edits.
+
             Full commands allow spectators access to all standard ZenithProxy commands like `connect`, `disconnect`, etc.
             If this is disabled, spectators only have access to a limited set of core commands.
             """)
@@ -51,6 +55,7 @@ public class SpectatorCommand extends Command {
                 "publicChat on/off",
                 "chatSendsPrivateMessage on/off",
                 "playerCamOnJoin on/off",
+                "inventory on/off",
                 "fullCommands on/off",
                 "fullCommands slashCommands on/off",
                 "fullCommands requireRegularWhitelist on/off",
@@ -175,6 +180,13 @@ public class SpectatorCommand extends Command {
                     .title("Player Cam On Join " + toggleStrCaps(CONFIG.server.spectator.playerCamOnJoin))
                     .primaryColor();
             })))
+            .then(literal("inventory").then(argument("toggle", toggle()).executes(c -> {
+                CONFIG.server.spectator.inventory = getToggle(c, "toggle");
+                SpectatorInventory.refreshAll();
+                c.getSource().getEmbed()
+                    .title("Spectator Inventory " + toggleStrCaps(CONFIG.server.spectator.inventory))
+                    .primaryColor();
+            })))
             .then(literal("fullCommands").requires(Command::validateAccountOwner)
                 .then(argument("toggle", toggle()).executes(c -> {
                     CONFIG.server.spectator.fullCommandsEnabled = getToggle(c, "toggle");
@@ -219,6 +231,7 @@ public class SpectatorCommand extends Command {
             .addField("Chat Sends Private Message", toggleStr(CONFIG.server.spectator.chatSendsPrivateMessage))
             .addField("Entity", CONFIG.server.spectator.spectatorEntity)
             .addField("PlayerCam On Join", toggleStr(CONFIG.server.spectator.playerCamOnJoin))
+            .addField("Inventory", toggleStr(CONFIG.server.spectator.inventory))
             .addField("Full Commands", toggleStr(CONFIG.server.spectator.fullCommandsEnabled))
             .addField("Full Commands Slash Commands", toggleStr(CONFIG.server.spectator.fullCommandsAcceptSlashCommands))
             .addField("Full Commands Require Regular Whitelist", toggleStr(CONFIG.server.spectator.fullCommandsRequireRegularWhitelist))

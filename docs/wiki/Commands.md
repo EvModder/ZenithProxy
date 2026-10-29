@@ -69,6 +69,12 @@ Spectator entities control what entity is used to represent spectators in-game.
 
 
 
+`inventory on` mirrors the proxy account's live inventory to spectators, read-only.
+
+Defaults on. Does not expose open container screens or allow spectator inventory edits.
+
+
+
 Full commands allow spectators access to all standard ZenithProxy commands like `connect`, `disconnect`, etc.
 
 If this is disabled, spectators only have access to a limited set of core commands.
@@ -94,6 +100,8 @@ If this is disabled, spectators only have access to a limited set of core comman
   ```spectator chatSendsPrivateMessage on/off```
 
   ```spectator playerCamOnJoin on/off```
+
+  ```spectator inventory on/off```
 
   ```spectator fullCommands on/off```
 
