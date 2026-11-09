@@ -1,12 +1,6 @@
 # ZenithProxy
 
 <p align="center">
-  <a href="https://discord.gg/nJZrSaRKtb">
-  <img alt="Discord" src="https://dcbadge.limes.pink/api/server/nJZrSaRKtb">
-  </a>
-</p>
-
-<p align="center">
   <img src="https://img.shields.io/badge/MC-1.21.4-brightgreen.svg" alt="Minecraft"/>
   <img src="https://img.shields.io/endpoint?url=https%3A%2F%2Ftokei.kojix2.net%2Fbadge%2Fgithub%2Frfresh2%2FZenithProxy%2Flines" alt="Lines of Code"/>
 </p>
@@ -22,7 +16,7 @@ This is a fork by [EvModder](https://github.com/EvModder), adapted for my own pe
 
 - **Restart notices:** Initial/final-minute/restart alerts, shared per server/channel across local proxies.
 - **Discord presence:** Shared bot descriptions, nonblocking updates, fewer timestamps.
-- **Discord notifications:** Account labels, less spam, optional command logging; no short-session disconnect filter.
+- **Discord notifications:** Account labels, less spam, optional command logging.
 - **Periodic clicks:** Allows left/right click intervals above 100 ticks.
 - **Autofishing:** Reliable bite detection, two-attempt hooked-loot recovery, clearer warnings.
 - **AutoEat:** Uses offhand/hotbar food in place and restores the previous item after eating.
