@@ -1,6 +1,7 @@
 package com.zenith.network.client.handler.incoming;
 
 import com.zenith.Proxy;
+import com.zenith.event.chat.ActionBarTextEvent;
 import com.zenith.event.chat.DeathMessageChatEvent;
 import com.zenith.event.chat.PublicChatEvent;
 import com.zenith.event.chat.SystemChatEvent;
@@ -33,7 +34,8 @@ public class SystemChatHandler implements ClientEventLoopPacketHandler<Clientbou
     public boolean applyAsync(@NonNull ClientboundSystemChatPacket packet, @NonNull ClientSession session) {
         try {
             if (packet.isOverlay()) {
-                return true; // skip action bar text
+                EVENT_BUS.postAsync(new ActionBarTextEvent(ComponentSerializer.serializePlain(packet.getContent())));
+                return true;
             }
             logSystemChat(packet);
             final Component component = packet.getContent();

@@ -483,6 +483,21 @@ public class DiscordBot {
         sendEmbedMessage(null, embed);
     }
 
+    CompletableFuture<?> sendServerRestartNotification(@Nullable String message, Embed embed) {
+        var channel = mainChannel;
+        if (!isRunning() || channel == null) return CompletableFuture.failedFuture(new IllegalStateException("Discord is offline"));
+        // This is server-wide, so intentionally bypass per-account embed decoration.
+        return channel.sendMessage(notificationMessage(message, embed)).timeout(30, TimeUnit.SECONDS).submit()
+            .thenAccept(sent -> {
+                try {
+                    CommandOutputHelper.logEmbedOutputToTerminal(embed);
+                    EVENT_BUS.postAsync(new MainChannelMessageSentEvent(embed, message));
+                } catch (Exception e) {
+                    DISCORD_LOG.warn("Restart notice delivered, but local logging failed", e);
+                }
+            });
+    }
+
     static MessageCreateData notificationMessage(@Nullable String message, Embed embed) {
         var builder = new MessageCreateBuilder().setContent(message);
         // A titleless attachment is intentionally sent without a redundant notification embed.

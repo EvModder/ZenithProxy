@@ -1,7 +1,9 @@
 package com.zenith.discord;
 
 import com.zenith.Proxy;
+import com.zenith.event.chat.ActionBarTextEvent;
 import com.zenith.event.chat.DeathMessageChatEvent;
+import com.zenith.event.chat.SystemChatEvent;
 import com.zenith.event.client.*;
 import com.zenith.event.discord.NotificationSentEvent;
 import com.zenith.event.module.*;
@@ -49,6 +51,12 @@ import static java.util.Arrays.asList;
 import static java.util.Objects.nonNull;
 
 public class NotificationEventListener {
+    private final ServerRestartNotifications restarts = new ServerRestartNotifications(
+        () -> ServerRestartNotifications.stateFile(CONFIG.discord.restartNotificationStateDirectory,
+            CONFIG.discord.channelId, CONFIG.client.server.address, CONFIG.client.server.port),
+        () -> CONFIG.discord.restartCountdownPattern,
+        embed -> DISCORD.sendServerRestartNotification(CONFIG.discord.mentionRoleOnServerRestart ? notificationMention() : null, embed),
+        System::currentTimeMillis);
     private final DeathNotifications deaths = new DeathNotifications(embed -> {
         if (CONFIG.discord.mentionRoleOnDeath) sendEmbedMessage(notificationMention(), embed);
         else sendEmbedMessage(embed);
@@ -86,7 +94,9 @@ public class NotificationEventListener {
             of(ServerPlayerConnectedEvent.class, this::handleServerPlayerConnectedEventStalk),
             of(ServerPlayerDisconnectedEvent.class, this::handleServerPlayerDisconnectedEventStalk),
             of(UpdateStartEvent.class, this::handleUpdateStartEvent),
-            of(ServerRestartingEvent.class, this::handleServerRestartingEvent),
+            of(ServerRestartingEvent.class, event -> handleRestartAnnouncement(event.message())),
+            of(ActionBarTextEvent.class, event -> handleRestartAnnouncement(event.message())),
+            of(SystemChatEvent.class, event -> handleRestartAnnouncement(event.message())),
             of(ClientLoginFailedEvent.class, this::handleProxyLoginFailedEvent),
             // of(ClientStartConnectEvent.class, this::handleStartConnectEvent),
             of(PrioStatusUpdateEvent.class, this::handlePrioStatusUpdateEvent),
@@ -195,6 +205,9 @@ public class NotificationEventListener {
 
     public void handleDisconnectEvent(ClientDisconnectEvent event) {
         var category = DisconnectReasonInfo.getDisconnectCategory(event.reason());
+        if (!event.manualDisconnect() && restartNotificationsEnabled()) {
+            restarts.disconnected(event.reason(), CONFIG.discord.restartDisconnectPattern);
+        }
         var embed = Embed.builder()
             .title(CONFIG.authentication.username+" disconnected")
             .addField(/*Server-given reason*/"Reason", event.reason(), false)
@@ -281,6 +294,7 @@ public class NotificationEventListener {
     }
 
     public void handleStartQueueEvent(QueueStartEvent event) {
+        if (event.wasOnline() && Proxy.getInstance().isOn2b2t() && restartNotificationsEnabled()) restarts.restarted();
         var embed = Embed.builder()
             .title(CONFIG.authentication.username+" started queuing")
             .inQueueColor()
@@ -724,16 +738,12 @@ public class NotificationEventListener {
         sendEmbedMessage(embed);
     }
 
-    public void handleServerRestartingEvent(ServerRestartingEvent event) {
-        var embed = Embed.builder()
-            .title("Server Restarting")
-            .errorColor()
-            .addField("Message", event.message(), true);
-        if (CONFIG.discord.mentionRoleOnServerRestart) {
-            sendEmbedMessage(notificationMention(), embed);
-        } else {
-            sendEmbedMessage(embed);
-        }
+    public void handleRestartAnnouncement(String message) {
+        if (restartNotificationsEnabled()) restarts.countdown(message);
+    }
+
+    private static boolean restartNotificationsEnabled() {
+        return CONFIG.discord.enable && CONFIG.discord.serverRestartNotifications;
     }
 
     public void handleProxyLoginFailedEvent(ClientLoginFailedEvent event) {

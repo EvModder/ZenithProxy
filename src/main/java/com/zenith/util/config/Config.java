@@ -943,6 +943,16 @@ public final class Config {
         public boolean mentionRoleOnStartQueue = false;
         public boolean mentionRoleOnDeath = false;
         public boolean mentionRoleOnServerRestart = false;
+        public boolean serverRestartNotifications = true;
+        public static final String DEFAULT_RESTART_COUNTDOWN_PATTERN =
+            "(?i)^Server restarting in (?<remaining>\\d{1,5}) (?<unit>minutes?|seconds?)\\.{0,3}$";
+        // Full-match server announcement pattern; named groups: remaining (integer), unit (minutes/seconds).
+        public String restartCountdownPattern = DEFAULT_RESTART_COUNTDOWN_PATTERN;
+        public static final String DEFAULT_RESTART_DISCONNECT_PATTERN = "(?i)^Server (?:closed|(?:is )?restarting)[.!]*$";
+        // Full-match restart disconnect reason; only accepted near a previously announced deadline.
+        public String restartDisconnectPattern = DEFAULT_RESTART_DISCONNECT_PATTERN;
+        // Empty uses a shared per-user temporary directory; set the same path on peers using different temp dirs.
+        public String restartNotificationStateDirectory = "";
         public boolean mentionRoleOnLoginFailed = false;
         public boolean clientConnectionMessages = true;
         public boolean mentionOnClientConnected = false;

@@ -968,6 +968,8 @@ Configures various discord notifications regarding player and proxy connections,
 
   ```discordNotifications serverRestart mention on/off```
 
+  ```discordNotifications serverRestart on/off```
+
   ```discordNotifications loginFailed mention on/off```
 
   ```discordNotifications clientConnect mention on/off```

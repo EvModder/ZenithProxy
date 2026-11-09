@@ -37,6 +37,7 @@ public class DiscordNotificationsCommand extends Command {
                 "startQueue mention on/off",
                 "death mention on/off",
                 "serverRestart mention on/off",
+                "serverRestart on/off",
                 "loginFailed mention on/off",
                 "clientConnect mention on/off",
                 "clientDisconnect mention on/off",
@@ -111,7 +112,13 @@ public class DiscordNotificationsCommand extends Command {
                     .title("Death Mention " + toggleStrCaps(CONFIG.discord.mentionRoleOnDeath));
                 return OK;
             }))))
-            .then(literal("serverRestart").then(literal("mention").then(argument("toggle", toggle()).executes(c -> {
+            .then(literal("serverRestart")
+                .then(argument("toggle", toggle()).executes(c -> {
+                    CONFIG.discord.serverRestartNotifications = getToggle(c, "toggle");
+                    c.getSource().getEmbed().title("Server Restart Notifications " + toggleStrCaps(CONFIG.discord.serverRestartNotifications));
+                    return OK;
+                }))
+                .then(literal("mention").then(argument("toggle", toggle()).executes(c -> {
                 CONFIG.discord.mentionRoleOnServerRestart = getToggle(c, "toggle");
                 c.getSource().getEmbed()
                     .title("Server Restart Mention " + toggleStrCaps(CONFIG.discord.mentionRoleOnServerRestart));
@@ -178,6 +185,7 @@ public class DiscordNotificationsCommand extends Command {
             .addField("Disconnect Mention", toggleStr(CONFIG.discord.mentionRoleOnDisconnect))
             .addField("Start Queue Mention", toggleStr(CONFIG.discord.mentionRoleOnStartQueue))
             .addField("Death Mention", toggleStr(CONFIG.discord.mentionRoleOnDeath))
+            .addField("Server Restart Notifications", toggleStr(CONFIG.discord.serverRestartNotifications))
             .addField("Server Restart Mention", toggleStr(CONFIG.discord.mentionRoleOnServerRestart))
             .addField("Login Failed Mention", toggleStr(CONFIG.discord.mentionRoleOnLoginFailed))
             .addField("Client Connect Mention", toggleStr(CONFIG.discord.mentionOnClientConnected))

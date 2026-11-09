@@ -20,6 +20,7 @@ This is a fork by [EvModder](https://github.com/EvModder), adapted for my own pe
 
 ## Changes in this fork
 
+- **Restart notices:** Initial/final-minute/restart alerts, shared per server/channel across local proxies.
 - **Discord presence:** Shared bot descriptions, nonblocking updates, fewer timestamps.
 - **Discord notifications:** Account labels, less spam, optional command logging; no short-session disconnect filter.
 - **Periodic clicks:** Allows left/right click intervals above 100 ticks.

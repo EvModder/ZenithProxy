@@ -1,6 +1,7 @@
 package com.zenith.network.client.handler.incoming;
 
 import com.zenith.Proxy;
+import com.zenith.event.chat.ActionBarTextEvent;
 import com.zenith.event.server.ServerRestartingEvent;
 import com.zenith.network.client.ClientSession;
 import com.zenith.network.codec.ClientEventLoopPacketHandler;
@@ -19,6 +20,7 @@ public class SetActionBarTextHandler implements ClientEventLoopPacketHandler<Cli
 
     @Override
     public boolean applyAsync(final ClientboundSetActionBarTextPacket packet, final ClientSession session) {
+        EVENT_BUS.postAsync(new ActionBarTextEvent(ComponentSerializer.serializePlain(packet.getText())));
         if (Proxy.getInstance().isOn2b2t()) parse2bRestart(packet, session);
         return true;
     }
