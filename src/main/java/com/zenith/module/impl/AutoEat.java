@@ -23,6 +23,8 @@ import org.geysermc.mcprotocollib.protocol.data.game.item.ItemStack;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -135,12 +137,22 @@ public class AutoEat extends AbstractInventoryModule {
             return new InventoryActionResult(ActionState.NO_ITEM, RequestFuture.rejected, 0);
         var inventory = CACHE.getPlayerCache().getPlayerInventory();
         int previousSlot = CACHE.getPlayerCache().getHeldItemSlot();
-        int foodSlot = source >= 36 ? source - 36 : previousSlot;
+        int foodSlot = source >= 36 ? source - 36 : InventoryUtil.findHotbarSlot(previousSlot);
         var food = inventory.get(source);
         var displaced = inventory.get(foodSlot + 36);
         int generation = selectionGeneration;
+        var selection = new FoodSelection(previousSlot, foodSlot, source, displaced, food.getId());
         var action = source >= 36 ? new SetHeldItem(foodSlot)
             : new MoveToHotbarSlot(source, MoveToHotbarAction.from(foodSlot));
+        var selectFood = new SetHeldItem(foodSlot) {
+            @Override public MinecraftPacket packet() {
+                if (foodSelection != selection || generation != selectionGeneration
+                    || Proxy.getInstance().hasActivePlayer()
+                    || CACHE.getPlayerCache().getHeldItemSlot() != previousSlot
+                    || !Objects.equals(CACHE.getPlayerCache().getPlayerInventory().get(foodSlot + 36), food)) return null;
+                return super.packet();
+            }
+        };
         var future = submitFoodAction(() -> {
             var currentInventory = CACHE.getPlayerCache().getPlayerInventory();
             if (generation != selectionGeneration || Proxy.getInstance().hasActivePlayer()
@@ -148,16 +160,24 @@ public class AutoEat extends AbstractInventoryModule {
                 || !Objects.equals(currentInventory.get(source), food)
                 || !Objects.equals(currentInventory.get(foodSlot + 36), displaced)) return null;
             var packet = action.packet();
-            if (packet != null) foodSelection = new FoodSelection(previousSlot, foodSlot, source, displaced, food.getId());
+            if (packet != null) foodSelection = selection;
             return packet;
-        });
+        }, source < 36 && foodSlot != previousSlot ? new InventoryAction[]{selectFood} : new InventoryAction[0]);
         return new InventoryActionResult(ActionState.SWAPPING, future, 0);
     }
 
     boolean restoreFoodSelection() {
         var selection = foodSelection;
         if (selection == null) return false;
+        int generation = selectionGeneration;
         INPUTS.submit(InputRequest.noInput(this, getPriority()));
+        var restoreSlot = new SetHeldItem(selection.previousSlot()) {
+            @Override public MinecraftPacket packet() {
+                if (generation != selectionGeneration || Proxy.getInstance().hasActivePlayer()
+                    || CACHE.getPlayerCache().getHeldItemSlot() != selection.foodSlot()) return null;
+                return super.packet();
+            }
+        };
         swapFuture = submitFoodAction(() -> {
             if (foodSelection != selection || Proxy.getInstance().hasActivePlayer()) return null;
             var inventory = CACHE.getPlayerCache().getPlayerInventory();
@@ -187,20 +207,24 @@ public class AutoEat extends AbstractInventoryModule {
             var packet = action.packet();
             if (packet != null) foodSelection = null;
             return packet;
-        });
+        }, selection.sourceSlot() < 36 && selection.foodSlot() != selection.previousSlot()
+            ? new InventoryAction[]{restoreSlot} : new InventoryAction[0]);
         return true;
     }
 
-    private RequestFuture submitFoodAction(Supplier<MinecraftPacket> packet) {
-        return submitInventoryAction(new InventoryAction() {
+    private RequestFuture submitFoodAction(Supplier<MinecraftPacket> packet, InventoryAction... following) {
+        var actions = new ArrayList<InventoryAction>(following.length + 1);
+        actions.add(new InventoryAction() {
             @Override public int containerId() { return 0; }
             @Override public MinecraftPacket packet() { return packet.get(); }
         });
+        actions.addAll(Arrays.asList(following));
+        return submitInventoryAction(actions.toArray(InventoryAction[]::new));
     }
 
-    RequestFuture submitInventoryAction(InventoryAction action) {
+    RequestFuture submitInventoryAction(InventoryAction... actions) {
         return INVENTORY.submit(InventoryActionRequest.builder()
-            .owner(this).actions(action).priority(getPriority()).build());
+            .owner(this).actions(actions).priority(getPriority()).build());
     }
 
     void startEating() {

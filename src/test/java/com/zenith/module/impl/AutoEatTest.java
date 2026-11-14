@@ -56,6 +56,9 @@ class AutoEatTest {
 
     private static void slot(int index, ItemStack stack) { CACHE.getPlayerCache().setInventorySlot(0, stack, index); }
     private static ItemStack slot(int index) { return CACHE.getPlayerCache().getPlayerInventory().get(index); }
+    private final ItemStack filler = new ItemStack(ItemRegistry.COBBLESTONE.id(), 1);
+    // occupy every hotbar slot except the selected one, so main-inventory food must displace it
+    private void fillHotbar() { for (int i = 36; i <= 44; i++) if (i != 38) slot(i, filler); }
     private void equip() {
         assertEquals(AbstractInventoryModule.ActionState.SWAPPING, eat.doInventoryActionsV2().state());
         eat.execute();
@@ -75,12 +78,29 @@ class AutoEatTest {
         assertTrue(eat.sent.stream().allMatch(p -> p instanceof ServerboundSetCarriedItemPacket));
     }
 
-    @Test void mainInventoryFoodTemporarilySwapsWithSelectedSlotNotSlotOne() {
+    @Test void mainInventoryFoodMovesToAnEmptyHotbarSlotAndRestoresSelection() {
+        slot(20, food);
+        equip();
+        assertEquals(food, slot(36));
+        assertEquals(sword, slot(38));
+        assertNull(slot(20));
+        assertEquals(0, CACHE.getPlayerCache().getHeldItemSlot());
+        slot(36, new ItemStack(food.getId(), 63));
+        assertTrue(eat.restoreFoodSelection());
+        eat.execute();
+        assertEquals(sword, slot(38));
+        assertNull(slot(36));
+        assertEquals(63, slot(20).getAmount());
+        assertEquals(2, CACHE.getPlayerCache().getHeldItemSlot());
+    }
+
+    @Test void mainInventoryFoodSwapsWithSelectedSlotWhenHotbarIsFull() {
+        fillHotbar();
         slot(20, food);
         equip();
         assertEquals(food, slot(38));
         assertEquals(sword, slot(20));
-        assertNull(slot(36));
+        assertEquals(filler, slot(36));
         slot(38, new ItemStack(food.getId(), 63));
         assertTrue(eat.restoreFoodSelection());
         eat.execute();
@@ -90,6 +110,7 @@ class AutoEatTest {
     }
 
     @Test void consumingLastFoodStillRestoresDisplacedSword() {
+        fillHotbar();
         slot(20, new ItemStack(food.getId(), 1));
         equip();
         slot(38, null);
@@ -104,6 +125,7 @@ class AutoEatTest {
         for (var leftover : new ItemStack[]{new ItemStack(ItemRegistry.BOWL.id(), 1),
             new ItemStack(ItemRegistry.GLASS_BOTTLE.id(), 1)}) {
             eat.reset();
+            fillHotbar();
             slot(20, food);
             equip();
             slot(38, leftover);
@@ -269,28 +291,33 @@ class AutoEatTest {
     }
 
     private static class TestAutoEat extends AutoEat {
-        record Pending(InventoryAction action, RequestFuture future) {}
+        record Pending(InventoryAction[] actions, RequestFuture future) {}
         final ArrayDeque<Pending> pending = new ArrayDeque<>();
         final List<MinecraftPacket> sent = new ArrayList<>();
         boolean rejectNext;
         int meals;
 
-        @Override RequestFuture submitInventoryAction(InventoryAction action) {
+        @Override RequestFuture submitInventoryAction(InventoryAction... actions) {
             if (rejectNext) { rejectNext = false; return RequestFuture.rejected; }
             var future = new RequestFuture();
-            pending.add(new Pending(action, future));
+            pending.add(new Pending(actions, future));
             return future;
         }
 
+        // runs every action of the next request in order; returns the first action's packet
         MinecraftPacket execute() {
             var request = pending.removeFirst();
-            var packet = request.action().packet();
-            if (packet instanceof ServerboundSetCarriedItemPacket held) CACHE.getPlayerCache().setHeldItemSlot(held.getSlot());
-            else if (packet instanceof ServerboundContainerClickPacket click)
-                CACHE.getPlayerCache().getInventoryCache().handleContainerClick(click);
-            if (packet != null) sent.add(packet);
+            MinecraftPacket first = null;
+            for (int i = 0; i < request.actions().length; i++) {
+                var packet = request.actions()[i].packet();
+                if (packet instanceof ServerboundSetCarriedItemPacket held) CACHE.getPlayerCache().setHeldItemSlot(held.getSlot());
+                else if (packet instanceof ServerboundContainerClickPacket click)
+                    CACHE.getPlayerCache().getInventoryCache().handleContainerClick(click);
+                if (packet != null) sent.add(packet);
+                if (i == 0) first = packet;
+            }
             request.future().complete(true);
-            return packet;
+            return first;
         }
 
         @Override public boolean enabledSetting() { return true; }
