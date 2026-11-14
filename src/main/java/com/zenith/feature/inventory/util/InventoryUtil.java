@@ -17,6 +17,15 @@ import static com.zenith.Globals.CACHE;
 public class InventoryUtil {
     private InventoryUtil() {}
 
+    public static int findHotbarSlot(int preferredSlot) {
+        var inventory = CACHE.getPlayerCache().getPlayerInventory();
+        if (inventory.get(preferredSlot + 36) == Container.EMPTY_STACK) return preferredSlot;
+        for (int i = 36; i <= 44; i++) {
+            if (inventory.get(i) == Container.EMPTY_STACK) return i - 36;
+        }
+        return preferredSlot;
+    }
+
     // returns -1 if not found
     // only searches player inventory
     public static int searchPlayerInventory(Predicate<ItemStack> predicate) {

@@ -3,6 +3,7 @@ package com.zenith.module.impl;
 import com.zenith.cache.data.inventory.Container;
 import com.zenith.feature.inventory.InventoryActionRequest;
 import com.zenith.feature.inventory.actions.*;
+import com.zenith.feature.inventory.util.InventoryUtil;
 import com.zenith.module.api.Module;
 import com.zenith.util.RequestFuture;
 import lombok.Getter;
@@ -99,13 +100,12 @@ public abstract class AbstractInventoryModule extends Module {
 
     private MoveToHotbarAction getActionSlot() {
         if (handRestriction == HandRestriction.OFF_HAND) return MoveToHotbarAction.OFF_HAND;
-        return MoveToHotbarAction.from(targetMainHandHotbarSlot);
+        return MoveToHotbarAction.from(InventoryUtil.findHotbarSlot(targetMainHandHotbarSlot));
     }
 
     // assumes we've already tested that the item is not equipped
-    // returns true if we performed an item swap
+    // Select an existing hotbar item; only move items when a hand restriction or inventory location requires it.
     private @Nullable RequestFuture switchToItem() {
-        // find next and switch it to our hotbar slot
         final List<ItemStack> inventory = CACHE.getPlayerCache().getPlayerInventory();
         for (int i = 44; i >= 9; i--) {
             ItemStack itemStack = inventory.get(i);
@@ -115,13 +115,17 @@ public abstract class AbstractInventoryModule extends Module {
                 if (openContainer != 0) {
                     actions.add(new CloseContainer(openContainer));
                 }
-                if (CACHE.getPlayerCache().getInventoryCache().getMouseStack() != Container.EMPTY_STACK) {
-                    actions.add(new DropMouseStack(ClickItemAction.LEFT_CLICK));
-                }
-                var actionSlot = getActionSlot();
-                actions.add(new MoveToHotbarSlot(i, actionSlot));
-                if (actionSlot != MoveToHotbarAction.OFF_HAND) {
-                    actions.add(new SetHeldItem(targetMainHandHotbarSlot));
+                if (i >= 36 && handRestriction != HandRestriction.OFF_HAND) {
+                    actions.add(new SetHeldItem(i - 36));
+                } else {
+                    if (CACHE.getPlayerCache().getInventoryCache().getMouseStack() != Container.EMPTY_STACK) {
+                        actions.add(new DropMouseStack(ClickItemAction.LEFT_CLICK));
+                    }
+                    var actionSlot = getActionSlot();
+                    actions.add(new MoveToHotbarSlot(i, actionSlot));
+                    if (actionSlot != MoveToHotbarAction.OFF_HAND) {
+                        actions.add(new SetHeldItem(actionSlot.getId()));
+                    }
                 }
 
                 // todo: we could calculate and return the expected delay given our action list
