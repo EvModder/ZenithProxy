@@ -38,9 +38,11 @@ public class IgnoreCommand extends Command {
         return command("ignore")
             .then(literal("add").then(argument("player", string()).executes(c -> {
                 String player = c.getArgument("player", String.class);
-                PLAYER_LISTS.getIgnoreList().add(player).ifPresentOrElse(
-                    ignored -> c.getSource().getEmbed()
-                        .title(escape(ignored.getUsername()) + " ignored!"),
+                PLAYER_LISTS.getIgnoreList().addOrFind(player).ifPresentOrElse(
+                    r -> c.getSource().getEmbed()
+                        .title(r.added()
+                            ? escape(r.entry().getUsername()) + " ignored!"
+                            : escape(r.entry().getUsername()) + " is already on the ignore list"),
                     () -> c.getSource().getEmbed()
                         .title("Failed to add " + escape(player) + " to ignore list. Unable to lookup profile.")
                         .errorColor());
@@ -56,14 +58,19 @@ public class IgnoreCommand extends Command {
                     return ERROR;
                 }
                 List<String> addErrors = new ArrayList<>();
+                int alreadyListed = 0;
                 for (var player : split) {
-                    if (PLAYER_LISTS.getIgnoreList().add(player).isEmpty()) {
-                        addErrors.add(player);
-                    }
+                    var result = PLAYER_LISTS.getIgnoreList().addOrFind(player);
+                    if (result.isEmpty()) addErrors.add(player);
+                    else if (!result.get().added()) alreadyListed++;
                 }
                 c.getSource().getEmbed()
                     .title("Added Players")
-                    .addField("Added Player Count", split.length - addErrors.size());
+                    .addField("Added Player Count", split.length - addErrors.size() - alreadyListed);
+                if (alreadyListed > 0) {
+                    c.getSource().getEmbed()
+                        .addField("Already Ignored", alreadyListed);
+                }
                 if (!addErrors.isEmpty()) {
                     c.getSource().getEmbed()
                         .description("Failed adding " + addErrors.size() + " players: " + String.join(", ", addErrors));
@@ -72,9 +79,10 @@ public class IgnoreCommand extends Command {
             })))
             .then(literal("del").then(argument("player", string()).executes(c -> {
                 String player = c.getArgument("player", String.class);
-                PLAYER_LISTS.getIgnoreList().remove(player);
                 c.getSource().getEmbed()
-                    .title(escape(player) + " removed from ignore list!");
+                    .title(PLAYER_LISTS.getIgnoreList().remove(player)
+                        ? escape(player) + " removed from ignore list!"
+                        : escape(player) + " isn't on the ignore list");
             })))
             .then(literal("list").executes(c -> {
                 c.getSource().getEmbed()

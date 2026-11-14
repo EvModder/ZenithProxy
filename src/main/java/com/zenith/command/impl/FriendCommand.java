@@ -41,10 +41,12 @@ public class FriendCommand extends Command {
         return command("friend")
             .then(literal("add").then(argument("player", string()).executes(c -> {
                 final String player = StringArgumentType.getString(c, "player");
-                PLAYER_LISTS.getFriendsList().add(player)
-                    .ifPresentOrElse(e ->
+                PLAYER_LISTS.getFriendsList().addOrFind(player)
+                    .ifPresentOrElse(r ->
                             c.getSource().getEmbed()
-                                .title("Friend added"),
+                                .title(r.added()
+                                    ? "Friend added"
+                                    : escape(r.entry().getUsername()) + " is already on the friend list"),
                         () -> c.getSource().getEmbed()
                             .title("Failed to add user: " + escape(player) + " to friends. Unable to lookup profile."));
             })))
@@ -58,14 +60,19 @@ public class FriendCommand extends Command {
                     return ERROR;
                 }
                 List<String> addErrors = new ArrayList<>();
+                int alreadyListed = 0;
                 for (var player : split) {
-                    if (PLAYER_LISTS.getFriendsList().add(player).isEmpty()) {
-                        addErrors.add(player);
-                    }
+                    var result = PLAYER_LISTS.getFriendsList().addOrFind(player);
+                    if (result.isEmpty()) addErrors.add(player);
+                    else if (!result.get().added()) alreadyListed++;
                 }
                 c.getSource().getEmbed()
                     .title("Added Players")
-                    .addField("Added Player Count", split.length - addErrors.size());
+                    .addField("Added Player Count", split.length - addErrors.size() - alreadyListed);
+                if (alreadyListed > 0) {
+                    c.getSource().getEmbed()
+                        .addField("Already Friends", alreadyListed);
+                }
                 if (!addErrors.isEmpty()) {
                     c.getSource().getEmbed()
                         .description("Failed adding " + addErrors.size() + " players: " + String.join(", ", addErrors));
@@ -74,9 +81,10 @@ public class FriendCommand extends Command {
             })))
             .then(literal("del").then(argument("player", string()).executes(c -> {
                 final String player = StringArgumentType.getString(c, "player");
-                PLAYER_LISTS.getFriendsList().remove(player);
                 c.getSource().getEmbed()
-                    .title("Friend deleted");
+                    .title(PLAYER_LISTS.getFriendsList().remove(player)
+                        ? "Friend deleted"
+                        : escape(player) + " isn't on the friend list");
             })))
             .then(literal("list").executes(c -> {
                 c.getSource().getEmbed()

@@ -508,9 +508,9 @@ public class NotificationEventListener {
                         .orElse("Unknown"),
                     event.playerEntry().getName(),
                     event.playerEntry().getProfileId());
-                PLAYER_LISTS.getFriendsList().add(event.playerEntry().getName());
+                final boolean added = PLAYER_LISTS.getFriendsList().add(event.playerEntry().getName(), event.playerEntry().getProfileId());
                 e.replyEmbeds(Embed.builder()
-                        .title("Friend Added")
+                        .title(added ? "Friend Added" : "Already on Friend List")
                         .successColor()
                         .addField("Player Name", escape(event.playerEntry().getName()), true)
                         .addField("Player UUID", ("[" + event.playerEntry().getProfileId() + "](https://namemc.com/profile/" + event.playerEntry().getProfileId() + ")"), true)
@@ -603,9 +603,9 @@ public class NotificationEventListener {
                             Optional.ofNullable(e.getInteraction().getMember()).map(m -> m.getUser().getName()).orElse("Unknown"),
                             event.gameProfile().getName(),
                             event.gameProfile().getId().toString());
-                        PLAYER_LISTS.getWhitelist().add(event.gameProfile().getName());
+                        final boolean added = PLAYER_LISTS.getWhitelist().add(event.gameProfile().getName(), event.gameProfile().getId());
                         e.replyEmbeds(Embed.builder()
-                            .title("Player Whitelisted")
+                            .title(added ? "Player Whitelisted" : "Already Whitelisted")
                             .successColor()
                             .addField("Player Name", escape(event.gameProfile().getName()), true)
                             .addField("Player UUID", ("[" + event.gameProfile().getId().toString() + "](https://namemc.com/profile/" + event.gameProfile().getId().toString() + ")"), true)

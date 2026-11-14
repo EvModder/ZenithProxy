@@ -14,29 +14,32 @@ public record PlayerList(
     String name,
     ArrayList<PlayerEntry> entries // reference to list in Config
 ) {
+    /** @param added false if the player was already on the list */
+    public record AddResult(PlayerEntry entry, boolean added) {}
+
+    // empty if the profile lookup failed
+    public synchronized Optional<AddResult> addOrFind(final String username) {
+        return createPlayerListEntry(username).map(entry -> {
+            final boolean added = !contains(entry.getUuid());
+            if (added) entries.add(entry);
+            return new AddResult(entry, added);
+        });
+    }
+
     public synchronized Optional<PlayerEntry> add(final String username) {
-        final Optional<PlayerEntry> playerListEntryOptional = createPlayerListEntry(username);
-        if (playerListEntryOptional.isPresent()) {
-            var playerListEntry = playerListEntryOptional.get();
-            if (!entries.contains(playerListEntry)) {
-                entries.add(playerListEntry);
-            }
-        }
-        return playerListEntryOptional;
+        return addOrFind(username).map(AddResult::entry);
     }
 
     // returns true if the account was added. false if the account was already present
     public synchronized boolean add(final String username, final UUID uuid) {
-        var entry = new PlayerEntry(username, uuid, Instant.now().getEpochSecond());
-        if (!entries.contains(entry)) {
-            entries.add(entry);
-            return true;
-        }
-        return false;
+        if (contains(uuid)) return false;
+        entries.add(new PlayerEntry(username, uuid, Instant.now().getEpochSecond()));
+        return true;
     }
 
-    public synchronized void remove(final String username) {
-        this.entries.removeIf(entry -> entry.getUsername().equalsIgnoreCase(username));
+    // returns true if the account was removed. false if the account was not present
+    public synchronized boolean remove(final String username) {
+        return this.entries.removeIf(entry -> entry.getUsername().equalsIgnoreCase(username));
     }
 
     public synchronized void remove(final UUID uuid) {

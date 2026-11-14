@@ -121,9 +121,11 @@ public class SpawnPatrolCommand extends Command {
             .then(literal("ignore")
                       .then(literal("add").then(argument("player", wordWithChars()).executes(c -> {
                           String player = getString(c, "player");
-                          PLAYER_LISTS.getSpawnPatrolIgnoreList().add(player).ifPresentOrElse(e -> {
+                          PLAYER_LISTS.getSpawnPatrolIgnoreList().addOrFind(player).ifPresentOrElse(r -> {
                               c.getSource().getEmbed()
-                                  .title("Added " + player + " to ignore list")
+                                  .title(r.added()
+                                      ? "Added " + player + " to ignore list"
+                                      : player + " is already on the ignore list")
                                   .description(playerListToString(PLAYER_LISTS.getSpawnPatrolIgnoreList()));
                           }, () -> {
                               c.getSource().getEmbed()
@@ -148,9 +150,10 @@ public class SpawnPatrolCommand extends Command {
                       })))
                       .then(literal("del").then(argument("player", wordWithChars()).executes(c -> {
                           String player = getString(c, "player");
-                          PLAYER_LISTS.getSpawnPatrolIgnoreList().remove(player);
                           c.getSource().getEmbed()
-                              .title("Removed " + player + " from ignore list")
+                              .title(PLAYER_LISTS.getSpawnPatrolIgnoreList().remove(player)
+                                  ? "Removed " + player + " from ignore list"
+                                  : player + " isn't on the ignore list")
                               .description(playerListToString(PLAYER_LISTS.getSpawnPatrolIgnoreList()));
                       })))
                       .then(literal("clear").executes(c -> {

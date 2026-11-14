@@ -53,9 +53,11 @@ public class WhitelistCommand extends Command {
         return command("whitelist")
             .then(literal("add").requires(Command::validateAccountOwner).then(argument("player", string()).executes(c -> {
                 final String player = StringArgumentType.getString(c, "player");
-                PLAYER_LISTS.getWhitelist().add(player).ifPresentOrElse(e ->
+                PLAYER_LISTS.getWhitelist().addOrFind(player).ifPresentOrElse(r ->
                         c.getSource().getEmbed()
-                            .title("Added user: " + escape(e.getUsername()) + " To Whitelist"),
+                            .title(r.added()
+                                ? "Added user: " + escape(r.entry().getUsername()) + " To Whitelist"
+                                : escape(r.entry().getUsername()) + " is already on the whitelist"),
                     () -> c.getSource().getEmbed()
                         .title("Failed to add user: " + escape(player) + " to whitelist. Unable to lookup profile."));
             })))
@@ -69,14 +71,19 @@ public class WhitelistCommand extends Command {
                     return ERROR;
                 }
                 List<String> addErrors = new ArrayList<>();
+                int alreadyListed = 0;
                 for (var player : split) {
-                    if (PLAYER_LISTS.getWhitelist().add(player).isEmpty()) {
-                        addErrors.add(player);
-                    }
+                    var result = PLAYER_LISTS.getWhitelist().addOrFind(player);
+                    if (result.isEmpty()) addErrors.add(player);
+                    else if (!result.get().added()) alreadyListed++;
                 }
                 c.getSource().getEmbed()
                     .title("Added Players")
-                    .addField("Added Player Count", split.length - addErrors.size());
+                    .addField("Added Player Count", split.length - addErrors.size() - alreadyListed);
+                if (alreadyListed > 0) {
+                    c.getSource().getEmbed()
+                        .addField("Already Whitelisted", alreadyListed);
+                }
                 if (!addErrors.isEmpty()) {
                     c.getSource().getEmbed()
                         .description("Failed adding " + addErrors.size() + " players: " + String.join(", ", addErrors));
@@ -85,10 +92,15 @@ public class WhitelistCommand extends Command {
             })))
             .then(literal("del").requires(Command::validateAccountOwner).then(argument("player", string()).executes(c -> {
                 final String player = StringArgumentType.getString(c, "player");
-                PLAYER_LISTS.getWhitelist().remove(player);
+                if (!PLAYER_LISTS.getWhitelist().remove(player)) {
+                    c.getSource().getEmbed()
+                        .title(escape(player) + " isn't on the whitelist");
+                    return OK;
+                }
                 c.getSource().getEmbed()
                     .title("Removed user: " + escape(player) + " From Whitelist");
                 Proxy.getInstance().kickNonWhitelistedPlayers();
+                return OK;
             })))
             .then(literal("list").executes(c -> {
                 c.getSource().getEmbed()
@@ -109,18 +121,25 @@ public class WhitelistCommand extends Command {
             .then(literal("blacklist").requires(Command::validateAccountOwner)
                 .then(literal("add").then(argument("player", string()).executes(c -> {
                     final String player = StringArgumentType.getString(c, "player");
-                    PLAYER_LISTS.getBlacklist().add(player).ifPresentOrElse(e ->
+                    PLAYER_LISTS.getBlacklist().addOrFind(player).ifPresentOrElse(r ->
                             c.getSource().getEmbed()
-                                .title("Added user: " + escape(e.getUsername()) + " To Blacklist"),
+                                .title(r.added()
+                                    ? "Added user: " + escape(r.entry().getUsername()) + " To Blacklist"
+                                    : escape(r.entry().getUsername()) + " is already on the blacklist"),
                         () -> c.getSource().getEmbed()
                             .title("Failed to add user: " + escape(player) + " to blacklist. Unable to lookup profile."));
                 })))
                 .then(literal("del").then(argument("player", string()).executes(c -> {
                     final String player = StringArgumentType.getString(c, "player");
-                    PLAYER_LISTS.getBlacklist().remove(player);
+                    if (!PLAYER_LISTS.getBlacklist().remove(player)) {
+                        c.getSource().getEmbed()
+                            .title(escape(player) + " isn't on the blacklist");
+                        return OK;
+                    }
                     c.getSource().getEmbed()
                         .title("Removed user: " + escape(player) + " From Blacklist");
                     Proxy.getInstance().kickNonWhitelistedPlayers();
+                    return OK;
                 })))
                 .then(literal("clear").executes(c -> {
                     PLAYER_LISTS.getBlacklist().clear();

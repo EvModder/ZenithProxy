@@ -17,6 +17,7 @@ This is a fork by [EvModder](https://github.com/EvModder), adapted for my own pe
 - **Restart notices:** Initial/final-minute/restart alerts, shared per server/channel across local proxies.
 - **Discord presence:** Shared bot descriptions, nonblocking updates, fewer timestamps.
 - **Discord notifications:** Account labels, less spam, optional command logging.
+- **Player lists:** Add/remove replies say when a player was already listed or not listed.
 - **Periodic clicks:** Allows left/right click intervals above 100 ticks.
 - **Item selection:** Uses existing hotbar slots; prefers empty slots when moving items from inventory.
 - **Autofishing:** Reliable bite detection, two-attempt hooked-loot recovery, clearer warnings.

@@ -80,10 +80,12 @@ public class SpectatorCommand extends Command {
             .then(literal("whitelist")
                 .then(literal("add").then(argument("player", string()).executes(c -> {
                     final String playerName = StringArgumentType.getString(c, "player");
-                    PLAYER_LISTS.getSpectatorWhitelist().add(playerName)
-                        .ifPresentOrElse(e ->
+                    PLAYER_LISTS.getSpectatorWhitelist().addOrFind(playerName)
+                        .ifPresentOrElse(r ->
                                 c.getSource().getEmbed()
-                                    .title("Added user: " + escape(e.getUsername()) + " To Spectator Whitelist")
+                                    .title(r.added()
+                                        ? "Added user: " + escape(r.entry().getUsername()) + " To Spectator Whitelist"
+                                        : escape(r.entry().getUsername()) + " is already on the spectator whitelist")
                                     .primaryColor()
                                     .description(spectatorWhitelist()),
                             () -> c.getSource().getEmbed()
@@ -101,14 +103,19 @@ public class SpectatorCommand extends Command {
                         return ERROR;
                     }
                     List<String> addErrors = new ArrayList<>();
+                    int alreadyListed = 0;
                     for (var player : split) {
-                        if (PLAYER_LISTS.getSpectatorWhitelist().add(player).isEmpty()) {
-                            addErrors.add(player);
-                        }
+                        var result = PLAYER_LISTS.getSpectatorWhitelist().addOrFind(player);
+                        if (result.isEmpty()) addErrors.add(player);
+                        else if (!result.get().added()) alreadyListed++;
                     }
                     c.getSource().getEmbed()
                         .title("Added Players")
-                        .addField("Added Player Count", split.length - addErrors.size());
+                        .addField("Added Player Count", split.length - addErrors.size() - alreadyListed);
+                    if (alreadyListed > 0) {
+                        c.getSource().getEmbed()
+                            .addField("Already Whitelisted", alreadyListed);
+                    }
                     if (!addErrors.isEmpty()) {
                         c.getSource().getEmbed()
                             .description("Failed adding " + addErrors.size() + " players: " + String.join(", ", addErrors));
@@ -117,12 +124,14 @@ public class SpectatorCommand extends Command {
                 })))
                 .then(literal("del").then(argument("player", string()).executes(c -> {
                     final String playerName = StringArgumentType.getString(c, "player");
-                    PLAYER_LISTS.getSpectatorWhitelist().remove(playerName);
+                    final boolean removed = PLAYER_LISTS.getSpectatorWhitelist().remove(playerName);
                     c.getSource().getEmbed()
-                        .title("Removed user: " + escape(playerName) + " From Spectator Whitelist")
+                        .title(removed
+                            ? "Removed user: " + escape(playerName) + " From Spectator Whitelist"
+                            : escape(playerName) + " isn't on the spectator whitelist")
                         .primaryColor()
                         .description(spectatorWhitelist());
-                    Proxy.getInstance().kickNonWhitelistedPlayers();
+                    if (removed) Proxy.getInstance().kickNonWhitelistedPlayers();
                 })))
                 .then(literal("clear").executes(c -> {
                     PLAYER_LISTS.getSpectatorWhitelist().clear();

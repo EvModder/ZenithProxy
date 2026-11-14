@@ -48,18 +48,21 @@ public class StalkCommand extends Command {
             }))
             .then(literal("add").then(argument("player", string()).executes(c -> {
                 final String player = StringArgumentType.getString(c, "player");
-                PLAYER_LISTS.getStalkList().add(player).ifPresentOrElse(e ->
+                PLAYER_LISTS.getStalkList().addOrFind(player).ifPresentOrElse(r ->
                     c.getSource().getEmbed()
-                            .title("Added player: " + escape(e.getUsername()) + " To Stalk List"),
+                            .title(r.added()
+                                ? "Added player: " + escape(r.entry().getUsername()) + " To Stalk List"
+                                : escape(r.entry().getUsername()) + " is already on the stalk list"),
                         () -> c.getSource().getEmbed()
                             .title("Failed to add player: " + escape(player) + " to stalk list. Unable to lookup profile."));
                 return OK;
             })))
             .then(literal("del").then(argument("player", string()).executes(c -> {
                 final String player = StringArgumentType.getString(c, "player");
-                PLAYER_LISTS.getStalkList().remove(player);
                 c.getSource().getEmbed()
-                    .title("Removed player: " + escape(player) + " From Stalk List");
+                    .title(PLAYER_LISTS.getStalkList().remove(player)
+                        ? "Removed player: " + escape(player) + " From Stalk List"
+                        : escape(player) + " isn't on the stalk list");
                 return OK;
             })));
     }
