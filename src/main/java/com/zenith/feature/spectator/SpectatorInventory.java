@@ -73,7 +73,8 @@ public final class SpectatorInventory {
 
     private static void onClientThread(Runnable action) {
         var client = Proxy.getInstance().getClient();
-        if (client == null || client.getClientEventLoop().inEventLoop()) action.run();
+        // A disconnect can terminate the client loop before its handlers finish.
+        if (client == null || client.getClientEventLoop().inEventLoop() || client.getClientEventLoop().isShuttingDown()) action.run();
         else client.getClientEventLoop().execute(action);
     }
 }
