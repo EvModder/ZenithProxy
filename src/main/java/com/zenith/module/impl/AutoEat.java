@@ -204,9 +204,9 @@ public class AutoEat extends AbstractInventoryModule {
                 }
                 action = new MoveToHotbarSlot(selection.sourceSlot(), MoveToHotbarAction.from(selection.foodSlot()));
             }
-            var packet = action.packet();
-            if (packet != null) foodSelection = null;
-            return packet;
+            // Give up if the action cannot be built (e.g. a cursor stack); retrying would block inputs every tick.
+            foodSelection = null;
+            return action.packet();
         }, selection.sourceSlot() < 36 && selection.foodSlot() != selection.previousSlot()
             ? new InventoryAction[]{restoreSlot} : new InventoryAction[0]);
         return true;
